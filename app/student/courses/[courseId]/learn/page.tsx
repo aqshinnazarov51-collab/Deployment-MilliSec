@@ -1,0 +1,4 @@
+import { redirect,notFound } from "next/navigation";
+import { db } from "@/lib/db";
+import { requireUser } from "@/lib/auth";
+export default async function StartCourse({params}:{params:Promise<{courseId:string}>}){const {courseId}=await params,user=await requireUser("STUDENT"),enrollment=await db.enrollment.findUnique({where:{userId_courseId:{userId:user.id,courseId}},include:{course:{include:{sections:{orderBy:{position:"asc"},include:{lessons:{orderBy:{position:"asc"}}}}}}}});if(!enrollment)notFound();const lessons=enrollment.course.sections.flatMap(s=>s.lessons);if(!lessons.length)notFound();const progress=await db.lessonProgress.findMany({where:{userId:user.id,lessonId:{in:lessons.map(l=>l.id)},completed:true},select:{lessonId:true}});const completed=new Set(progress.map(p=>p.lessonId));redirect(`/student/courses/${courseId}/learn/${(lessons.find(l=>!completed.has(l.id))??lessons[0]).id}`);}

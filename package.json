@@ -1,0 +1,44 @@
+{
+  "name": "lumio-learning-platform",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "tsx prisma/seed.ts",
+    "catalog:refresh": "tsx prisma/refresh-catalog.ts",
+    "db:update-demo-videos": "tsx prisma/update-demo-videos.ts",
+    "db:update-demo-content": "tsx prisma/update-demo-content.ts",
+    "db:add-demo-courses": "tsx prisma/add-demo-courses.ts",
+    "seed": "npm run db:seed"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.8.2",
+    "bcryptjs": "^3.0.2",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.468.0",
+    "next": "^15.3.2",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zod": "^3.24.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.5",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^22.15.18",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "^15.3.2",
+    "prisma": "^6.8.2",
+    "tailwindcss": "^4.1.5",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  },
+  "prisma": { "seed": "tsx prisma/seed.ts" }
+}

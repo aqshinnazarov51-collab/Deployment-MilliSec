@@ -1,0 +1,1 @@
+export function Alert({error,success}:{error?:string;success?:string}){return <>{error&&<div className="alert" role="alert">{error}</div>}{success&&<div className="success-note" role="status">{success==="1"?"Changes saved successfully.":success}</div>}</>;}
