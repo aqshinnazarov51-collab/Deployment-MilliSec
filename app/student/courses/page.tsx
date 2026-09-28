@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { EmptyState } from "@/components/EmptyState";
+import { BookOpenCheck } from "lucide-react";
 
 export default async function MyCourses() {
   const user = await requireUser("STUDENT");
@@ -84,11 +86,7 @@ export default async function MyCourses() {
           </table>
         </div>
       ) : (
-        <div className="empty-state panel">
-          <strong>Your course library is waiting</strong>
-          Explore the catalog and enroll in a course to start.
-          <Link href="/catalog" className="button button-small" style={{ marginTop: 15 }}>Explore courses</Link>
-        </div>
+        <div className="panel"><EmptyState icon={BookOpenCheck} title="Your course library is waiting" action={{ href: "/catalog", label: "Explore courses" }}>Find a course that catches your interest and your learning space will appear here.</EmptyState></div>
       )}
     </>
   );

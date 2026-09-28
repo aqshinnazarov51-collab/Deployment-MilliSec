@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { Check, ShoppingCart, Trash2 } from "lucide-react";
+import { Check, Compass, ShoppingCart, Trash2 } from "lucide-react";
+import { EmptyState } from "@/components/EmptyState";
 
 export type CartItem = { id: string; slug: string; title: string; price: number; cover: string };
 const KEY = "lumio_cart_v1";
@@ -143,8 +144,8 @@ export function CartPage() {
     <div className="eyebrow">Your picks</div>
     <h1>Shopping cart</h1>
     <p className="small-note">Prices are refreshed from the course catalog and checkout uses the same amount.</p>
-    {!ready ? <div className="panel empty-state">Loading your cart…</div> : items.length === 0
-      ? <div className="panel empty-state"><strong>Your cart is empty</strong>Save a course here and return when you’re ready.<Link className="button button-small" href="/catalog" style={{ marginTop: 14 }}>Explore courses</Link></div>
+    {!ready ? <div className="panel cart-loading"><span/><span/><span/></div> : items.length === 0
+      ? <div className="panel"><EmptyState icon={Compass} title="Your cart is ready for a good idea" action={{href:"/catalog",label:"Explore courses"}}>Save a course here and come back whenever you’re ready.</EmptyState></div>
       : <div className="cart-layout">
         <section className="panel">{items.map((item) => <div key={item.id} className="cart-row">
           <img src={item.cover} alt={`${item.title} course cover`} />

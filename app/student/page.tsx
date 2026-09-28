@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { BookOpenCheck, Sparkles } from "lucide-react";
+import { BookOpenCheck, PlayCircle, ReceiptText, Sparkles } from "lucide-react";
 import { CourseCard } from "@/components/CourseCard";
 import { LearningHabitCard } from "@/components/LearningHabitCard";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { EmptyState } from "@/components/EmptyState";
 
 export default async function StudentHome() {
   const user = await requireUser("STUDENT");
@@ -79,6 +80,7 @@ export default async function StudentHome() {
         done,
         total: lessonIds.length,
         percent: lessonIds.length ? Math.round((done / lessonIds.length) * 100) : 0,
+        nextLesson: enrollment.course.sections.flatMap((section) => section.lessons)[Math.min(done, Math.max(0, lessonIds.length - 1))] ?? null,
       };
     }),
   );
@@ -105,6 +107,10 @@ export default async function StudentHome() {
 
       <LearningHabitCard completedAt={completionDates} />
 
+      {coursesWithProgress[0]?.nextLesson && <Link className="next-lesson-card" href={`/student/courses/${coursesWithProgress[0].courseId}/learn/${coursesWithProgress[0].nextLesson.id}`}>
+        <span className="next-lesson-icon"><PlayCircle size={23} /></span><span className="next-lesson-copy"><small>UP NEXT · {coursesWithProgress[0].course.title}</small><strong>{coursesWithProgress[0].nextLesson.title}</strong><span>Continue where you left off</span></span><span className="next-lesson-action">Continue <PlayCircle size={15} /></span>
+      </Link>}
+
       <div className="split">
         <section className="panel">
           <div className="panel-header"><h2>Pick up where you left off</h2><Link href="/student/courses" className="text-link">All my courses →</Link></div>
@@ -115,7 +121,7 @@ export default async function StudentHome() {
               <Link className="button button-quiet button-small" href={`/student/courses/${course.course.id}/learn`}>Continue</Link>
             </div>
           )) : (
-            <div className="empty-state"><strong>Your next chapter is waiting</strong>Enroll in a course to start learning.<Link href="/catalog" className="text-link">Explore courses →</Link></div>
+            <EmptyState icon={BookOpenCheck} title="Your next chapter is waiting" action={{href:"/catalog",label:"Explore courses"}}>Choose a course to start learning at your own pace.</EmptyState>
           )}
         </section>
 
@@ -124,7 +130,7 @@ export default async function StudentHome() {
           {orders.length ? orders.slice(0, 3).map((order) => (
             <div key={order.id} className="course-row"><span className="category-symbol"><BookOpenCheck size={16} /></span><div className="course-row-main"><strong>{order.course.title}</strong><small>{order.createdAt.toLocaleDateString()} · {order.payment?.transactionId}</small></div><span className="pill">${order.amount}</span></div>
           )) : (
-            <div className="empty-state"><strong>No orders yet</strong>Your purchases will show up here.</div>
+            <EmptyState icon={ReceiptText} title="No orders yet">Your course purchases and receipts will show up here.</EmptyState>
           )}
         </section>
       </div>

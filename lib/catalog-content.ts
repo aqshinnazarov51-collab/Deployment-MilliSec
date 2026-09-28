@@ -1,4 +1,4 @@
-export type CourseBadge = "NEW" | "BESTSELLER" | null;
+export type CourseBadge = "NEW" | "BESTSELLER" | "POPULAR" | null;
 
 export const catalogContent = [
   { slug: "design-systems", category: "Programming", categorySlug: "programming", title: "Python for Data Analysis with Pandas", subtitle: "Turn raw datasets into clear answers with a practical Python workflow.", description: "Clean real-world data, explore patterns with pandas, build visual summaries, and package a repeatable analysis workflow from notebooks to reusable scripts.", price: 69, originalPrice: 119, level: "INTERMEDIATE", instructor: ["Nadia", "Rahman"], rating: 4.8, reviews: 632, learners: 18500, lessons: 12, durationMinutes: 195, badge: "BESTSELLER", cover: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=1000&q=85" },
@@ -28,5 +28,8 @@ export function getCatalogContent(slug: string) {
 }
 
 export function getCourseBadge(slug: string): CourseBadge {
-  return getCatalogContent(slug)?.badge ?? null;
+  const course = getCatalogContent(slug);
+  if (!course) return null;
+  if (course.badge) return course.badge;
+  return course.learners >= 20000 ? "POPULAR" : null;
 }

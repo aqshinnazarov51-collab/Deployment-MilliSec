@@ -1,34 +1,73 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Clock3, Globe2, GraduationCap, Heart, PlayCircle, Star, Users } from "lucide-react";
+import { ArrowRight, BookOpenCheck, Clock3, Globe2, GraduationCap, Heart, PlayCircle, Star, Users } from "lucide-react";
 import { db } from "@/lib/db";
 import { getUser } from "@/lib/auth";
 import { reviewCourse } from "@/actions/learning";
 import { toggleWishlist } from "@/actions/courses";
 import { Alert } from "@/components/Message";
+import { EmptyState } from "@/components/EmptyState";
 import { getCourseCover } from "@/lib/course-covers";
 import { getCatalogContent } from "@/lib/catalog-content";
 import { getSalePrice } from "@/lib/course-pricing";
-export default async function CoursePage({params,searchParams}:{params:Promise<{slug:string}>;searchParams:Promise<{error?:string;reviewed?:string}>}){
- const {slug}=await params,p=await searchParams;
- const [course,user]=await Promise.all([
-  db.course.findUnique({
-   where:{slug},
-   include:{
-    category:true,
-    instructor:{include:{profile:true}},
-    sections:{orderBy:{position:"asc"},include:{lessons:{orderBy:{position:"asc"}}}},
-    _count:{select:{enrollments:true}},
-    reviews:{include:{user:{include:{profile:true}}},orderBy:{createdAt:"desc"}},
-   },
-  }),
-  getUser(),
- ]);
- if(!course||course.status!=="PUBLISHED")notFound();
- const lessons=course.sections.flatMap(s=>s.lessons),content=getCatalogContent(course.slug),sale=getSalePrice(course.price,course.slug),rating=content?.rating??(course.reviews.length?course.reviews.reduce((a,r)=>a+r.rating,0)/course.reviews.length:0),reviewCount=content?.reviews??course.reviews.length,learners=content?.learners??course._count.enrollments,totalMinutes=content?.durationMinutes??lessons.reduce((sum:number,l)=>sum+l.durationMinutes,0),durationLabel=totalMinutes?`${Math.floor(totalMinutes/60)?`${Math.floor(totalMinutes/60)}h `:""}${totalMinutes%60?`${totalMinutes%60}m`:""}`.trim():"Self-paced";
- const displayInstructor=content?.instructor.join(" ")??`${course.instructor.firstName} ${course.instructor.lastName}`;
- const enrolled=user?await db.enrollment.findUnique({where:{userId_courseId:{userId:user.id,courseId:course.id}}}):null;
- const favorite=user?.role==="STUDENT"?await db.wishlist.findUnique({where:{userId_courseId:{userId:user.id,courseId:course.id}}}):null;
- const [icon,color]=(course.thumbnail??"✳|#edf0ff").split("|");
- return <><section className="course-hero"><div className="shell course-detail-grid"><div><div className="eyebrow">{course.category.name} · {course.level.toLowerCase()}</div><h1>{course.title}</h1><p className="course-detail-copy">{course.subtitle} {course.description}</p><div className="course-stats"><span><Star size={14} fill="#e29a41" color="#e29a41" style={{display:"inline",verticalAlign:"-2px"}}/> <b>{rating?rating.toFixed(1):"New"}</b> · {reviewCount} reviews</span><span><Users size={14} style={{display:"inline",verticalAlign:"-2px"}}/> {learners} learners</span><span><PlayCircle size={14} style={{display:"inline",verticalAlign:"-2px"}}/> {content?.lessons ?? lessons.length} lessons</span><span><Clock3 size={14} style={{display:"inline",verticalAlign:"-2px"}}/> {durationLabel}</span><span><Globe2 size={14} style={{display:"inline",verticalAlign:"-2px"}}/> {course.language}</span></div><div className="small-note">Created by <strong>{displayInstructor}</strong> · Updated {course.updatedAt.toLocaleDateString("en-US",{month:"long",year:"numeric"})}</div></div><aside className="purchase-card"><div className="course-art" style={{height:140,borderRadius:12,marginBottom:14,background:color||"#edf0ff"}}><img className="course-art-image" src={getCourseCover(course.slug)} alt={`${course.title} course cover photo`}/></div><div className="price">{course.price===0?"Free":sale.original?<><s className="old-price">${sale.original}</s> ${sale.current}</>:`$${sale.current}`}</div><p className="small-note">Lifetime access · Learn at your own pace</p>{enrolled?<Link href={`/student/courses/${course.id}/learn`} className="button full">Continue learning</Link>:<Link href={user?`/checkout/${course.id}`:`/login?next=/checkout/${course.id}`} className="button full">{course.price===0?"Enroll for free":"Get this course"}</Link>}{user?.role==="STUDENT"&&<form action={toggleWishlist} style={{marginTop:9}}><input type="hidden" name="courseId" value={course.id}/><button className="button button-outline full" type="submit"><Heart size={15} fill={favorite?"currentColor":"none"}/>{favorite?"Saved to favorites":"Save to favorites"}</button></form>}<p className="small-note" style={{textAlign:"center",marginBottom:0}}>30-day learning guarantee · Instant access</p></aside></div></section><main className="shell" style={{paddingTop:35,paddingBottom:60}}><div className="split"><section><h2 style={{fontSize:22,letterSpacing:"-.6px"}}>What you’ll learn</h2><p className="course-detail-copy">A practical, project-based path from curious beginner to confident practitioner. Lessons are designed to give you an idea and a way to use it.</p><h2 style={{fontSize:22,letterSpacing:"-.6px",marginTop:32}}>Course curriculum <span className="small-note">· {course.sections.length} sections · {content?.lessons ?? lessons.length} lessons</span></h2><div className="curriculum">{course.sections.map(section=><div key={section.id}><div className="curriculum-section"><strong style={{fontSize:12}}>{section.title}</strong><span className="small-note" style={{float:"right"}}>{section.lessons.length} lessons</span></div>{section.lessons.map(lesson=><div className="lesson-line" key={lesson.id}><span><PlayCircle size={14} style={{display:"inline",verticalAlign:"-2px",marginRight:7,color:"var(--brand)"}}/>{lesson.title}</span><small><Clock3 size={12} style={{display:"inline",verticalAlign:"-2px"}}/> {lesson.durationMinutes} min</small></div>)}</div>)}</div><h2 style={{fontSize:22,letterSpacing:"-.6px",marginTop:34}}>Learner reviews</h2>{user&&enrolled&&!course.reviews.some(r=>r.userId===user.id)&&<div className="panel"><form action={reviewCourse}><input type="hidden" name="courseId" value={course.id}/><input type="hidden" name="slug" value={course.slug}/><div className="field"><label>Your rating</label><select name="rating" defaultValue="5"><option value="5">★★★★★ — Loved it</option><option value="4">★★★★ — Really good</option><option value="3">★★★ — Good</option><option value="2">★★ — Could be better</option><option value="1">★ — Not for me</option></select></div><div className="field"><label>Your review</label><textarea name="text" required maxLength={1500} placeholder="What did you find useful?"/></div><button className="button button-small">Share review</button></form></div>}<Alert error={p.error} success={p.reviewed}/>{course.reviews.map(r=><div key={r.id} className="panel" style={{marginBottom:10}}><div style={{display:"flex",alignItems:"center",gap:8}}><strong style={{fontSize:12}}>{r.user.firstName} {r.user.lastName}</strong>{r.user.email.endsWith("@reviewer.lumio.demo")&&<span className="pill pill-gray">Demo review</span>}</div><div style={{color:"#e39b41",fontSize:12}}>{"★".repeat(r.rating)}{"☆".repeat(5-r.rating)} <span className="small-note">· {r.createdAt.toLocaleDateString()}</span></div><p style={{fontSize:12,color:"var(--muted)",margin:"8px 0 0"}}>{r.text}</p></div>)}</section><aside><div className="panel"><h3>About this course</h3><div className="course-stats" style={{display:"grid",gap:12}}><span><GraduationCap size={15} style={{display:"inline",verticalAlign:"-3px"}}/> Level: {course.level.toLowerCase()}</span><span><Clock3 size={15} style={{display:"inline",verticalAlign:"-3px"}}/> {durationLabel} on demand</span><span><PlayCircle size={15} style={{display:"inline",verticalAlign:"-3px"}}/> {lessons.length} short lessons</span></div></div><div className="panel"><h3>Your instructor</h3><div style={{display:"flex",gap:11,alignItems:"center",marginTop:13}}><span className="avatar-dot" style={{width:42,height:42,fontSize:13,margin:0}}>{course.instructor.firstName[0]}{course.instructor.lastName[0]}</span><div><strong style={{fontSize:13}}>{displayInstructor}</strong><div className="small-note">Lumio educator</div></div></div><p className="small-note">{course.instructor.profile?.bio}</p></div></aside></div></main></>;
+
+export default async function CoursePage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ error?: string; reviewed?: string }> }) {
+  const [{ slug }, search, user] = await Promise.all([params, searchParams, getUser()]);
+  const course = await db.course.findUnique({
+    where: { slug },
+    include: {
+      category: true,
+      instructor: { include: { profile: true } },
+      sections: { orderBy: { position: "asc" }, include: { lessons: { orderBy: { position: "asc" } } } },
+      _count: { select: { enrollments: true } },
+      reviews: { include: { user: { include: { profile: true } } }, orderBy: { createdAt: "desc" } },
+    },
+  });
+  if (!course || course.status !== "PUBLISHED") notFound();
+
+  const lessons = course.sections.flatMap((section) => section.lessons);
+  const content = getCatalogContent(course.slug);
+  const sale = getSalePrice(course.price, course.slug);
+  const rating = content?.rating ?? (course.reviews.length ? course.reviews.reduce((sum, review) => sum + review.rating, 0) / course.reviews.length : 0);
+  const reviewCount = content?.reviews ?? course.reviews.length;
+  const learners = content?.learners ?? course._count.enrollments;
+  const totalMinutes = content?.durationMinutes ?? lessons.reduce((sum: number, lesson) => sum + lesson.durationMinutes, 0);
+  const duration = totalMinutes ? `${Math.floor(totalMinutes / 60) ? `${Math.floor(totalMinutes / 60)}h ` : ""}${totalMinutes % 60 ? `${totalMinutes % 60}m` : ""}`.trim() : "Self-paced";
+  const instructorName = content?.instructor.join(" ") ?? `${course.instructor.firstName} ${course.instructor.lastName}`;
+  const [enrollment, favorite] = user ? await Promise.all([
+    db.enrollment.findUnique({ where: { userId_courseId: { userId: user.id, courseId: course.id } } }),
+    user.role === "STUDENT" ? db.wishlist.findUnique({ where: { userId_courseId: { userId: user.id, courseId: course.id } } }) : Promise.resolve(null),
+  ]) : [null, null];
+  const averageRating = course.reviews.length ? course.reviews.reduce((sum, review) => sum + review.rating, 0) / course.reviews.length : rating;
+
+  return <>
+    <section className="course-detail-hero" style={{ backgroundImage: `linear-gradient(90deg,rgba(12,19,37,.91) 0%,rgba(12,19,37,.78) 46%,rgba(12,19,37,.22) 100%),url("${getCourseCover(course.slug)}")` }}>
+      <div className="shell course-detail-hero-inner">
+        <div className="course-detail-copy-column">
+          <div className="course-detail-eyebrow">{course.category.name}<span>·</span>{course.level.toLowerCase()}</div>
+          <h1>{course.title}</h1>
+          <p>{course.subtitle} {course.description}</p>
+          <div className="course-detail-rating"><span className="rating-stars">{"★".repeat(Math.round(averageRating))}{"☆".repeat(5 - Math.round(averageRating))}</span><strong>{averageRating ? averageRating.toFixed(1) : "New"}</strong><span>({reviewCount.toLocaleString()} reviews)</span><span className="course-rating-dot">·</span><span>{learners.toLocaleString()} learners</span></div>
+          <Link href={`/educators/${course.instructor.username}`} className="course-instructor-hero"><span className="instructor-photo">{course.instructor.profile?.avatarUrl ? <img src={course.instructor.profile.avatarUrl} alt="" /> : `${course.instructor.firstName[0]}${course.instructor.lastName[0]}`}</span><span><small>Created by</small><strong>{instructorName}</strong></span><span className="instructor-verified"><BookOpenCheck size={14} /> Lumio educator</span></Link>
+          <div className="course-hero-facts"><span><PlayCircle size={15} />{content?.lessons ?? lessons.length} lessons</span><span><Clock3 size={15} />{duration}</span><span><Globe2 size={15} />{course.language}</span><span><GraduationCap size={15} />Lifetime access</span></div>
+        </div>
+      </div>
+    </section>
+
+    <main className="shell course-detail-layout">
+      <article className="course-detail-main">
+        <section className="panel course-outcomes"><div className="eyebrow">Course overview</div><h2>What you’ll learn</h2><p>A practical, project-based path from curious beginner to confident practitioner. Lessons are designed to give you an idea and a way to use it.</p><div className="outcome-grid"><span><BookOpenCheck size={16} />Build practical skills with guided exercises</span><span><BookOpenCheck size={16} />Apply each concept to a real project</span><span><BookOpenCheck size={16} />Learn at a pace that works for you</span><span><BookOpenCheck size={16} />Keep access to lessons and updates</span></div></section>
+
+        <section className="panel course-curriculum-panel"><div className="course-section-heading"><div><div className="eyebrow">Step by step</div><h2>Course curriculum</h2></div><span className="curriculum-total">{course.sections.length} sections <span>·</span> {content?.lessons ?? lessons.length} lessons <span>·</span> {duration}</span></div><div className="curriculum">{course.sections.map((section, sectionIndex) => <div key={section.id}><div className="curriculum-section course-curriculum-section"><span className="section-number">{String(sectionIndex + 1).padStart(2, "0")}</span><strong>{section.title}</strong><span className="small-note">{section.lessons.length} lessons</span></div>{section.lessons.map((lesson, lessonIndex) => <div className="lesson-line course-lesson-line" key={lesson.id}><span><span className="lesson-index">{String(lessonIndex + 1).padStart(2, "0")}</span><PlayCircle size={15} />{lesson.title}</span><small><Clock3 size={12} /> {lesson.durationMinutes} min</small></div>)}</div>)}</div></section>
+
+        <section className="course-reviews-section"><div className="course-section-heading"><div><div className="eyebrow">Learner feedback</div><h2>Reviews</h2></div><div className="review-summary"><strong>{averageRating ? averageRating.toFixed(1) : "New"}</strong><span className="rating-stars">{"★".repeat(Math.round(averageRating))}{"☆".repeat(5 - Math.round(averageRating))}</span><small>{reviewCount.toLocaleString()} reviews</small></div></div>
+          {user && enrollment && !course.reviews.some((review) => review.userId === user.id) && <div className="panel review-form-card"><form action={reviewCourse}><input type="hidden" name="courseId" value={course.id} /><input type="hidden" name="slug" value={course.slug} /><div className="field"><label>Your rating</label><select name="rating" defaultValue="5"><option value="5">★★★★★ — Loved it</option><option value="4">★★★★ — Really good</option><option value="3">★★★ — Good</option><option value="2">★★ — Could be better</option><option value="1">★ — Not for me</option></select></div><div className="field"><label>Your review</label><textarea name="text" required maxLength={1500} placeholder="What did you find useful?" /></div><button className="button button-small">Share review</button></form></div>}
+          <Alert error={search.error} success={search.reviewed} />
+          {course.reviews.length ? course.reviews.map((review) => <div key={review.id} className="panel learner-review"><div className="reviewer-avatar">{review.user.profile?.avatarUrl ? <img src={review.user.profile.avatarUrl} alt="" /> : `${review.user.firstName[0]}${review.user.lastName[0]}`}</div><div className="reviewer-content"><div className="reviewer-name-row"><strong>{review.user.firstName} {review.user.lastName}</strong>{review.user.email.endsWith("@reviewer.lumio.demo") && <span className="pill pill-gray">Lumio community</span>}</div><div className="review-stars">{"★".repeat(review.rating)}{"☆".repeat(5 - review.rating)} <span>{review.createdAt.toLocaleDateString("en-US", { month: "short", year: "numeric" })}</span></div><p>{review.text}</p></div></div>) : <div className="panel"><EmptyState icon={Star} title="Be the first to share a review">Learner feedback will appear here as the Lumio community takes this course.</EmptyState></div>}
+        </section>
+      </article>
+
+      <aside className="course-detail-aside"><div className="purchase-card course-purchase-card"><div className="course-purchase-cover"><img src={getCourseCover(course.slug)} alt={`${course.title} course cover`} /></div><div className="course-price-large">{course.price === 0 ? "Free" : <>{sale.original && <s className="old-price">${sale.original}</s>}<strong>${sale.current}</strong></>}</div><p className="course-purchase-note">One-time payment · Lifetime access</p>{enrollment ? <Link href={`/student/courses/${course.id}/learn`} className="button full">Continue learning <ArrowRight size={15} /></Link> : <Link href={user ? `/checkout/${course.id}` : `/login?next=/checkout/${course.id}`} className="button full">{course.price === 0 ? "Enroll for free" : "Get this course"} <ArrowRight size={15} /></Link>}{user?.role === "STUDENT" && <form action={toggleWishlist} className="course-save-form"><input type="hidden" name="courseId" value={course.id} /><button className="button button-outline full" type="submit"><Heart size={15} fill={favorite ? "currentColor" : "none"} />{favorite ? "Saved to favorites" : "Save to favorites"}</button></form>}<div className="purchase-includes"><strong>This course includes</strong><span><PlayCircle size={14} />{content?.lessons ?? lessons.length} on-demand lessons</span><span><Clock3 size={14} />{duration} total length</span><span><Globe2 size={14} />Learn from any device</span><span><GraduationCap size={14} />Certificate on completion</span></div></div></aside>
+    </main>
+  </>;
 }
