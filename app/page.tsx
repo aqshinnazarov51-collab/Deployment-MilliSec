@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { ArrowRight, BookOpenCheck, Code2, Compass, Globe2, HeartHandshake, Server, Smartphone, Sparkles } from "lucide-react";
+import { ArrowRight, Code2, Compass, Globe2, HeartHandshake, Server, Smartphone, Sparkles } from "lucide-react";
 import { db } from "@/lib/db";
 import { CourseCard } from "@/components/CourseCard";
+import { FeaturedCourseCarousel } from "@/components/FeaturedCourseCarousel";
 import { getCourseCover } from "@/lib/course-covers";
 
 const categoryIcons = {
@@ -30,11 +31,8 @@ export default async function Home() {
   ]);
 
   const categoryBySlug = new Map(categories.map((category) => [category.slug, category]));
-  const featured = courses[0];
-  const featuredCover = featured ? getCourseCover(featured.slug) : getCourseCover("practical-typescript");
-  const featuredSlug = featured?.slug ?? "practical-typescript";
-  const featuredTitle = featured?.title ?? "Practical skills for your next step";
-  const featuredSubtitle = featured?.subtitle ?? "Build confidence with a focused, hands-on course.";
+  const featuredCover = courses[0] ? getCourseCover(courses[0].slug) : getCourseCover("practical-typescript");
+  const featuredSlides = courses.length ? courses.map((course) => ({ slug: course.slug, title: course.title, subtitle: course.subtitle, cover: getCourseCover(course.slug), category: course.category.name })) : [{ slug: "practical-typescript", title: "Practical skills for your next step", subtitle: "Build confidence with a focused, hands-on course.", cover: featuredCover, category: "Lumio" }];
 
   return <>
     <section className="hero hero-showcase">
@@ -49,11 +47,7 @@ export default async function Home() {
           </div>
           <div className="hero-proof"><div className="avatars"><span className="avatar-dot">JM</span><span className="avatar-dot">AR</span><span className="avatar-dot">SK</span><span className="avatar-dot">+</span></div><span><strong>A little progress adds up.</strong><br />Learn alongside a curious community.</span></div>
         </div>
-        <Link href={`/courses/${featuredSlug}`} className="hero-featured" style={{ backgroundImage: `linear-gradient(180deg,rgba(13,20,39,.03) 12%,rgba(13,20,39,.88) 100%),url("${featuredCover}")` }}>
-          <span className="hero-featured-label"><BookOpenCheck size={14} /> Featured course</span>
-          <span className="hero-featured-content"><span className="hero-featured-kicker">A good place to begin</span><strong>{featuredTitle}</strong><span>{featuredSubtitle}</span><span className="hero-featured-cta">Discover course <ArrowRight size={15} /></span></span>
-          <span className="hero-featured-glow" />
-        </Link>
+        <FeaturedCourseCarousel slides={featuredSlides} />
       </div>
     </section>
 

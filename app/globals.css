@@ -262,3 +262,25 @@ h1,h2,h3{font-family:Inter,"Segoe UI",Arial,Helvetica,sans-serif;letter-spacing:
 .theme-dark .notification-panel{background:#172235}
 @media(prefers-reduced-motion:reduce){.route-transition{animation:none}}
 @media(max-width:700px){.nav-links .nav-main-link.is-active:after{bottom:-6px}.notification-panel{position:fixed;right:10px;top:62px;width:min(290px,calc(100vw - 20px))}.educator-profile-heading{align-items:flex-start;gap:14px;margin-top:20px}.educator-profile-avatar{width:76px;height:76px;border-radius:24px;font-size:25px}.educator-profile-intro h1{font-size:29px}.educator-profile-intro>p{font-size:11px}.educator-profile-stats{gap:7px;margin-top:18px}.educator-profile-stats>span{padding:8px;font-size:9px}.educator-courses-section{padding-top:35px}}
+
+.hero-carousel{position:relative;isolation:isolate;min-width:0;min-height:410px;border-radius:27px;overflow:hidden;background:#172238;box-shadow:0 24px 60px rgba(29,40,74,.2);color:#fff;transition:transform .25s ease,box-shadow .25s ease}
+.hero-carousel:hover{transform:translateY(-4px);box-shadow:0 30px 70px rgba(29,40,74,.26)}
+.hero-carousel-slides{position:absolute;inset:0}
+.hero-carousel-slide{position:absolute;inset:0;display:flex;align-items:flex-end;background-size:cover;background-position:center;opacity:0;visibility:hidden;transform:translateX(18px) scale(1.025);transition:opacity .62s ease,transform .72s cubic-bezier(.2,.7,.2,1),visibility .62s;}
+.hero-carousel-slide.is-active{z-index:1;opacity:1;visibility:visible;transform:translateX(0) scale(1)}
+.hero-carousel-slide .hero-featured-label{top:22px;left:22px}
+.hero-carousel-slide .hero-featured-content{position:absolute;left:27px;right:27px;bottom:64px;max-width:480px;animation:carousel-copy-in .55s .08s both}
+@keyframes carousel-copy-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.hero-slide-category{color:rgba(255,255,255,.72);font-weight:600}
+.hero-carousel-controls{position:absolute;z-index:3;left:22px;right:22px;bottom:18px;display:flex;align-items:center;gap:11px}
+.hero-carousel-arrow{width:30px;height:30px;flex:none;display:grid;place-items:center;border:1px solid rgba(255,255,255,.24);border-radius:50%;background:rgba(18,27,47,.38);backdrop-filter:blur(8px);color:#fff;transition:background .18s,transform .18s}
+.hero-carousel-arrow:hover{background:rgba(255,255,255,.2);transform:scale(1.06)}
+.hero-carousel-dots{display:flex;align-items:center;justify-content:center;gap:6px;flex:1}
+.hero-carousel-dot{width:7px;height:7px;padding:0;border:0;border-radius:8px;background:rgba(255,255,255,.46);transition:width .22s,background .22s}
+.hero-carousel-dot:hover{background:rgba(255,255,255,.8)}
+.hero-carousel-dot.is-active{width:22px;background:#fff}
+.hero-carousel-arrow:focus-visible,.hero-carousel-dot:focus-visible,.hero-featured-cta:focus-visible{outline:2px solid white;outline-offset:3px}
+.theme-dark .hero-carousel{box-shadow:0 24px 60px rgba(0,0,0,.35)}
+@media(max-width:1000px){.hero-carousel{min-height:365px}}
+@media(max-width:700px){.hero-carousel{min-height:310px;border-radius:21px}.hero-carousel-slide .hero-featured-label{top:15px;left:15px}.hero-carousel-slide .hero-featured-content{left:20px;right:20px;bottom:60px}.hero-carousel-controls{left:15px;right:15px;bottom:15px}.hero-carousel-arrow{width:28px;height:28px}}
+@media(prefers-reduced-motion:reduce){.hero-carousel,.hero-carousel-slide,.hero-carousel-arrow,.hero-carousel-dot{transition:none}.hero-carousel-slide .hero-featured-content{animation:none}}
