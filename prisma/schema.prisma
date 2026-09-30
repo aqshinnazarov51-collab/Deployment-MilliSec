@@ -222,3 +222,11 @@ model UserSettings {
   securityAlerts     Boolean @default(true)
   theme              String  @default("light")
 }
+model PromoCode {
+  id              String   @id @default(cuid())
+  code            String   @unique
+  discountPercent Int
+  used            Boolean  @default(false)
+  usedCount       Int      @default(0)
+  createdAt       DateTime @default(now())
+}
