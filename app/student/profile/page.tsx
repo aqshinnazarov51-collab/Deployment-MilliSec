@@ -29,7 +29,7 @@ export default async function Profile({ searchParams }: { searchParams: Promise<
           <h2>Profile photo</h2>
           <AvatarUpload initialUrl={user.profile?.avatarUrl ?? null} name={`${user.firstName} ${user.lastName}`} />
         </div>
-        <form action={updateProfile} className="panel">
+        <form action="/api/student/profile" method="POST" className="panel">
           <h2 style={{ marginBottom: 18 }}>Personal information</h2>
           <div className="form-grid">
             <div className="field"><label>First name</label><input required name="firstName" defaultValue={user.firstName} /></div>
