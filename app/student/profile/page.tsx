@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Alert } from "@/components/Message";
 import { AvatarUpload } from "@/components/AvatarUpload";
+import { WalletSummary } from "@/components/WalletSummary";
 
 export default async function Profile({ searchParams }: { searchParams: Promise<{ error?: string; saved?: string; user_id?: string }> }) {
   const sessionUser = await requireUser("STUDENT");
@@ -25,6 +26,7 @@ export default async function Profile({ searchParams }: { searchParams: Promise<
       </div>
       <div style={{ maxWidth: 780 }}>
         <Alert error={p.error} success={p.saved} />
+        <WalletSummary userId={sessionUser.id} />
         <div className="panel">
           <h2>Profile photo</h2>
           <AvatarUpload initialUrl={user.profile?.avatarUrl ?? null} name={`${user.firstName} ${user.lastName}`} />
