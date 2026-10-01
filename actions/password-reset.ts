@@ -32,7 +32,12 @@ export async function requestPasswordResetAction(form: FormData) {
   await db.passwordResetToken.deleteMany({ where: { userId: user.id } });
   await db.passwordResetToken.create({ data: { userId: user.id, tokenHash: hashToken(token), expiresAt } });
 
-  const baseUrl = (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "");
+  const isProduction = process.env.NODE_ENV === "production";
+  const configuredBaseUrl = (process.env.APP_URL || "").replace(/\/$/, "");
+  const configuredLocalUrl = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(configuredBaseUrl);
+  const baseUrl = configuredBaseUrl && !(isProduction && configuredLocalUrl)
+    ? configuredBaseUrl
+    : isProduction ? "https://lumiocourse.site" : "http://localhost:3000";
   const resetUrl = `${baseUrl}/reset-password?token=${token}`;
   let emailSent = false;
 
