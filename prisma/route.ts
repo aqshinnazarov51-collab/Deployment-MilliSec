@@ -1,22 +1,14 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
 
-export async function GET(request: Request) {
+export async function POST(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const filename = searchParams.get('filename');
+    const { url } = await request.json();
 
-    if (!filename) {
-      return NextResponse.json({ error: 'Filename is required' }, { status: 400 });
-    }
+    // ZƏİFLİK (SSRF): İstifadəçidən gələn URL heç bir yoxlamadan keçmədən fetch olunur
+    const response = await fetch(url);
+    const data = await response.text();
 
-    // ZƏİFLİK (Path Traversal): İstifadəçidən gələn filename sanitize edilmədən path.join olunur.
-    // Hücumçu "../../../etc/passwd" kimi yollar göndərərək sistem fayllarını oxuya bilər.
-    const filePath = path.join(process.cwd(), 'public', filename);
-    const fileContent = fs.readFileSync(filePath, 'utf-8');
-
-    return NextResponse.json({ success: true, content: fileContent });
+    return NextResponse.json({ success: true, data });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
