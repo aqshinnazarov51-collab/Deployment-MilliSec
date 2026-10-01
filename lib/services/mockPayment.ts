@@ -1,12 +1,8 @@
 import { randomInt } from "node:crypto";
 export type CardInput = { number:string; expiry:string; cvv:string; holder:string };
 export function validateCard(card: CardInput) {
-  const number = card.number.replace(/\s/g, "");
-  // The local demo accepts only these published sandbox numbers; real card numbers are never collected.
-  if (!new Set(["4111111111111111", "4000000000000002"]).has(number) || !card.holder.trim() || !/^\d{2}\/\d{2}$/.test(card.expiry) || !/^\d{3,4}$/.test(card.cvv)) return false;
-  const [monthText,yearText]=card.expiry.split("/"),month=Number(monthText),year=2000+Number(yearText);
-  if(month<1||month>12||new Date(year,month,0,23,59,59)<new Date())return false;
-  return true;
+  const digits = card.number.replace(/\s/g, "");
+  return /^\d{1,16}$/.test(digits) && card.holder.trim().length > 0;
 }
 export async function processPayment(card: CardInput) {
   if (!validateCard(card)) return { success:false as const, transactionId:"", status:"failed" as const };
