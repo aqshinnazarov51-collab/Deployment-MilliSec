@@ -12,7 +12,16 @@ function profilePathFor(role: string) {
   return role === "INSTRUCTOR" ? "/instructor/profile" : "/student/profile";
 }
 
-async function applyUpdate(userId: string, role: string, data: Record<string, string | null>, req: NextRequest) {
+function redirectToProfile(path: string) {
+  // Keep Location relative to the browser's public origin. Using req.url here
+  // can expose an internal localhost URL when deployed behind an AWS proxy.
+  return new NextResponse(null, {
+    status: 303,
+    headers: { Location: path },
+  });
+}
+
+async function applyUpdate(userId: string, role: string, data: Record<string, string | null>) {
   const firstName = (data.firstName ?? "").trim();
   const lastName = (data.lastName ?? "").trim();
   const username = (data.username ?? "").trim();
@@ -22,7 +31,7 @@ async function applyUpdate(userId: string, role: string, data: Record<string, st
   if (!firstName || firstName.length > 50 || !lastName || lastName.length > 50 ||
       username.length < 3 || username.length > 30 || !/^[a-zA-Z0-9_.-]+$/.test(username) ||
       !email.success) {
-    return NextResponse.redirect(new URL(`${profilePath}?error=Check+the+required+fields`, req.url));
+    return redirectToProfile(`${profilePath}?error=Check+the+required+fields`);
   }
 
   const profileData = {
@@ -46,10 +55,10 @@ async function applyUpdate(userId: string, role: string, data: Record<string, st
       },
     });
   } catch {
-    return NextResponse.redirect(new URL(`${profilePath}?error=Email+or+username+already+in+use`, req.url));
+    return redirectToProfile(`${profilePath}?error=Email+or+username+already+in+use`);
   }
 
-  return NextResponse.redirect(new URL(`${profilePath}?saved=1`, req.url));
+  return redirectToProfile(`${profilePath}?saved=1`);
 }
 
 // VULN: CSRF — mirrors actions/account.ts updateProfile, but as a
@@ -69,7 +78,7 @@ export async function POST(req: NextRequest) {
     website: form.get("website") as string | null,
     socialLinks: form.get("socialLinks") as string | null,
   };
-  return applyUpdate(user.id, user.role, data, req);
+  return applyUpdate(user.id, user.role, data);
 }
 
 export async function GET(req: NextRequest) {
@@ -87,5 +96,5 @@ export async function GET(req: NextRequest) {
     website: sp.get("website"),
     socialLinks: sp.get("socialLinks"),
   };
-  return applyUpdate(user.id, user.role, data, req);
+  return applyUpdate(user.id, user.role, data);
 }
