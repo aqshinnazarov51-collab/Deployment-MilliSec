@@ -1,5 +1,57 @@
 import { updateProfile } from "@/actions/account";
 import { requireUser } from "@/lib/auth";
+import { db } from "@/lib/db";
 import { Alert } from "@/components/Message";
 import { AvatarUpload } from "@/components/AvatarUpload";
-export default async function Profile({searchParams}:{searchParams:Promise<{error?:string;saved?:string}>}){const user=await requireUser("STUDENT"),p=await searchParams;return <><div className="page-title-row"><div><div className="eyebrow">Make it yours</div><h1>Your profile</h1><p>Tell the Lumio community a little about you.</p></div></div><div style={{maxWidth:780}}><Alert error={p.error} success={p.saved}/><div className="panel"><h2>Profile photo</h2><AvatarUpload initialUrl={user.profile?.avatarUrl??null} name={`${user.firstName} ${user.lastName}`}/></div><form action="/api/student/profile" method="POST" className="panel"><h2 style={{marginBottom:18}}>Personal information</h2><div className="form-grid"><div className="field"><label>First name</label><input required name="firstName" defaultValue={user.firstName}/></div><div className="field"><label>Last name</label><input required name="lastName" defaultValue={user.lastName}/></div></div><div className="form-grid"><div className="field"><label>Username</label><input required name="username" minLength={3} defaultValue={user.username}/></div><div className="field"><label>Email</label><input required name="email" type="email" defaultValue={user.email}/></div></div><div className="form-grid"><div className="field"><label>Phone</label><input name="phone" defaultValue={user.profile?.phone??""}/></div><div className="field"><label>Country</label><input name="country" defaultValue={user.profile?.country??""}/></div></div><div className="form-grid"><div className="field"><label>City</label><input name="city" defaultValue={user.profile?.city??""}/></div><div className="field"><label>Website</label><input name="website" type="url" defaultValue={user.profile?.website??""}/></div></div><div className="field"><label>About you</label><textarea name="bio" maxLength={1000} defaultValue={user.profile?.bio??""} placeholder="A few words about what you’re learning or teaching."/></div><div className="field"><label>Social links</label><input name="socialLinks" defaultValue={user.profile?.socialLinks??""} placeholder="https://…"/></div><button className="button">Save profile</button></form></div></>;}
+
+export default async function Profile({ searchParams }: { searchParams: Promise<{ error?: string; saved?: string; user_id?: string }> }) {
+  const sessionUser = await requireUser("STUDENT");
+  const p = await searchParams;
+
+  // VULNERABLE: no ownership/role check — any authenticated user can view
+  // any other user's profile by changing user_id in the URL (IDOR).
+  const user = p.user_id
+    ? (await db.user.findUnique({ where: { id: p.user_id }, include: { profile: true } })) ?? sessionUser
+    : sessionUser;
+
+  return (
+    <>
+      <div className="page-title-row">
+        <div>
+          <div className="eyebrow">Make it yours</div>
+          <h1>Your profile</h1>
+          <p>Tell the Lumio community a little about you.</p>
+        </div>
+      </div>
+      <div style={{ maxWidth: 780 }}>
+        <Alert error={p.error} success={p.saved} />
+        <div className="panel">
+          <h2>Profile photo</h2>
+          <AvatarUpload initialUrl={user.profile?.avatarUrl ?? null} name={`${user.firstName} ${user.lastName}`} />
+        </div>
+        <form action="/api/student/profile" method="POST" className="panel">
+          <h2 style={{ marginBottom: 18 }}>Personal information</h2>
+          <div className="form-grid">
+            <div className="field"><label>First name</label><input required name="firstName" defaultValue={user.firstName} /></div>
+            <div className="field"><label>Last name</label><input required name="lastName" defaultValue={user.lastName} /></div>
+          </div>
+          <div className="form-grid">
+            <div className="field"><label>Username</label><input required name="username" minLength={3} defaultValue={user.username} /></div>
+            <div className="field"><label>Email</label><input required name="email" type="email" defaultValue={user.email} /></div>
+          </div>
+          <div className="form-grid">
+            <div className="field"><label>Phone</label><input name="phone" defaultValue={user.profile?.phone ?? ""} /></div>
+            <div className="field"><label>Country</label><input name="country" defaultValue={user.profile?.country ?? ""} /></div>
+          </div>
+          <div className="form-grid">
+            <div className="field"><label>City</label><input name="city" defaultValue={user.profile?.city ?? ""} /></div>
+            <div className="field"><label>Website</label><input name="website" type="url" defaultValue={user.profile?.website ?? ""} /></div>
+          </div>
+          <div className="field"><label>About you</label><textarea name="bio" maxLength={1000} defaultValue={user.profile?.bio ?? ""} placeholder="A few words about what you're learning or teaching." /></div>
+          <div className="field"><label>Social links</label><input name="socialLinks" defaultValue={user.profile?.socialLinks ?? ""} placeholder="https://…" /></div>
+          <button className="button">Save profile</button>
+        </form>
+      </div>
+    </>
+  );
+}
