@@ -7,6 +7,7 @@ import { Alert } from "@/components/Message";
 import { PaymentFields } from "@/components/PaymentFields";
 import { CheckoutPromoProvider, PromoOrderTotal } from "@/components/CheckoutPromo";
 import { getSalePrice } from "@/lib/course-pricing";
+import { randomUUID } from "node:crypto";
 
 export default async function Checkout({
   params,
@@ -21,6 +22,7 @@ export default async function Checkout({
   const course = await db.course.findFirst({ where: { id: courseId, status: "PUBLISHED" }, include: { instructor: true } });
   if (!course) notFound();
   const sale=getSalePrice(course.price,course.slug);
+  const wallet=await db.wallet.findUnique({where:{userId:user.id},select:{balanceCents:true}});
   if (await db.enrollment.findUnique({ where: { userId_courseId: { userId: user.id, courseId } } })) {
     redirect(`/student/courses/${courseId}/learn`);
   }
@@ -35,7 +37,7 @@ export default async function Checkout({
         <section className="panel">
           <h2 style={{ marginBottom: 17 }}>Payment details</h2>
           <Alert error={search.error} />
-          <PaymentFields action={purchaseCourse} courseId={course.id} price={sale.current} />
+          <PaymentFields action={purchaseCourse} courseId={course.id} price={sale.current} walletBalanceCents={wallet?.balanceCents??0} idempotencyKey={randomUUID()} />
         </section>
         <aside className="purchase-card">
           <div className="eyebrow">Order summary</div>

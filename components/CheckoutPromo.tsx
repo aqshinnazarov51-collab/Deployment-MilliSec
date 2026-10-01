@@ -27,9 +27,13 @@ export function CheckoutPromoProvider({ courseIds, children }: { courseIds: stri
 }
 
 export function useCheckoutPromo() {
-  const context = useContext(PromoContext);
+  const context = useOptionalCheckoutPromo();
   if (!context) throw new Error("CheckoutPromoProvider is missing");
   return context;
+}
+
+export function useOptionalCheckoutPromo() {
+  return useContext(PromoContext);
 }
 
 export function PromoCodeInput() {

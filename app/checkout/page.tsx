@@ -8,6 +8,7 @@ import { CheckoutPromoProvider, PromoOrderTotal } from "@/components/CheckoutPro
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getSalePrice } from "@/lib/course-pricing";
+import { randomUUID } from "node:crypto";
 
 export default async function CartCheckout({ searchParams }: { searchParams: Promise<{ courseIds?: string; error?: string; success?: string; purchased?: string }> }) {
   const search = await searchParams;
@@ -43,6 +44,7 @@ export default async function CartCheckout({ searchParams }: { searchParams: Pro
   if (!toPurchase.length) redirect("/student/courses");
 
   const total = toPurchase.reduce((sum, course) => sum + getSalePrice(course.price, course.slug).current, 0);
+  const wallet = await db.wallet.findUnique({ where: { userId: user.id }, select: { balanceCents: true } });
 
   return <main className="shell" style={{ paddingTop: 43, paddingBottom: 65, maxWidth: 1080 }}>
     <div className="eyebrow">One checkout</div>
@@ -53,7 +55,7 @@ export default async function CartCheckout({ searchParams }: { searchParams: Pro
       <section className="panel">
         <h2 style={{ marginBottom: 17 }}>Payment details</h2>
         <Alert error={search.error} />
-        <PaymentFields action={purchaseCart} courseIds={toPurchase.map((course) => course.id)} price={total} />
+        <PaymentFields action={purchaseCart} courseIds={toPurchase.map((course) => course.id)} price={total} walletBalanceCents={wallet?.balanceCents ?? 0} idempotencyKey={randomUUID()} />
       </section>
       <aside className="purchase-card">
         <div className="eyebrow">Order summary</div>
