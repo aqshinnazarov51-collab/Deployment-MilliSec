@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { CourseCard } from "@/components/CourseCard";
 import { FeaturedCourseCarousel } from "@/components/FeaturedCourseCarousel";
 import { getCourseCover } from "@/lib/course-covers";
+import { getAvatarSrc } from "@/lib/avatar-storage";
+import { ProfileAvatar } from "@/components/ProfileAvatar";
 
 const categoryIcons = {
   programming: Code2,
@@ -80,7 +82,7 @@ export default async function Home() {
     </section>
 
     <section className="section section-soft">
-      <div className="shell"><div className="section-heading"><div><div className="eyebrow">Good teachers make a difference</div><h2>Meet your next favorite instructor</h2></div><Link href="/catalog" className="text-link">Find an educator <ArrowRight size={14} /></Link></div><div className="educator-grid">{educators.map((educator) => <Link key={educator.id} className="educator-card" href={`/educators/${educator.username}`}><span className="educator-avatar">{educator.profile?.avatarUrl ? <img src={educator.profile.avatarUrl} alt="" /> : `${educator.firstName[0]}${educator.lastName[0]}`}</span><strong>{educator.firstName} {educator.lastName}</strong><span className="small-note">{educator._count.courses} courses · Lumio educator</span><p className="small-note">{educator.profile?.bio ?? "Sharing practical ideas, one lesson at a time."}</p></Link>)}</div></div>
+      <div className="shell"><div className="section-heading"><div><div className="eyebrow">Good teachers make a difference</div><h2>Meet your next favorite instructor</h2></div><Link href="/catalog" className="text-link">Find an educator <ArrowRight size={14} /></Link></div><div className="educator-grid">{educators.map((educator) => <Link key={educator.id} className="educator-card" href={`/educators/${educator.username}`}><ProfileAvatar className="educator-avatar" src={educator.profile?.avatarUrl ? getAvatarSrc(educator.profile.avatarUrl) : null} name={`${educator.firstName} ${educator.lastName}`} /><strong>{educator.firstName} {educator.lastName}</strong><span className="small-note">{educator._count.courses} courses · Lumio educator</span><p className="small-note">{educator.profile?.bio ?? "Sharing practical ideas, one lesson at a time."}</p></Link>)}</div></div>
     </section>
 
     <section className="section">

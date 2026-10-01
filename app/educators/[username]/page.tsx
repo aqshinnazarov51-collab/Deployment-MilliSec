@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, BookOpenCheck, Globe2, GraduationCap, Star, Users } from "lucide-react";
 import { db } from "@/lib/db";
 import { CourseCard } from "@/components/CourseCard";
+import { getAvatarSrc } from "@/lib/avatar-storage";
+import { ProfileAvatar } from "@/components/ProfileAvatar";
 
 export default async function EducatorPage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;
@@ -29,7 +31,7 @@ export default async function EducatorPage({ params }: { params: Promise<{ usern
     <section className="educator-profile-hero"><div className="shell educator-profile-hero-inner">
       <Link href="/catalog" className="educator-back-link"><ArrowLeft size={14} /> Browse courses</Link>
       <div className="educator-profile-heading">
-        <span className="educator-profile-avatar">{educator.profile?.avatarUrl ? <img src={educator.profile.avatarUrl} alt={`${educator.firstName} ${educator.lastName}`} /> : `${educator.firstName[0]}${educator.lastName[0]}`}</span>
+          <ProfileAvatar className="educator-profile-avatar" src={educator.profile?.avatarUrl ? getAvatarSrc(educator.profile.avatarUrl) : null} name={`${educator.firstName} ${educator.lastName}`} />
         <div className="educator-profile-intro"><div className="eyebrow">Lumio instructor</div><h1>{educator.firstName} {educator.lastName}</h1><p>{educator.profile?.bio || "Sharing practical ideas and helping learners build skills one lesson at a time."}</p>
           {educator.profile?.website && <a className="educator-website" href={educator.profile.website} target="_blank" rel="noreferrer"><Globe2 size={14} /> Personal website</a>}
         </div>
