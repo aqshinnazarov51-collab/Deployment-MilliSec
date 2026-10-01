@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "predev": "prisma generate && prisma migrate dev",
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
@@ -11,6 +12,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
+    "db:setup": "prisma generate && prisma migrate dev",
     "catalog:refresh": "tsx prisma/refresh-catalog.ts",
     "db:update-demo-videos": "tsx prisma/update-demo-videos.ts",
     "db:update-demo-content": "tsx prisma/update-demo-content.ts",

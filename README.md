@@ -27,12 +27,13 @@ AUTH_SECRET="replace-with-a-long-random-secret-at-least-32-characters"
 UPLOAD_DIR="./public/uploads"
 ```
 
-Create the local database and seed demo content:
+Start the site:
 
 ```bash
-npx prisma migrate dev
-npm run seed
+npm run dev
 ```
+
+Before the first development start, Lumio automatically generates the Prisma client and applies database migrations. When Prisma creates a new database, its configured seed script adds the starter courses and demo accounts. Later starts apply pending migrations and keep the local data. The SQLite database file is intentionally excluded from Git; each collaborator gets a separate local database. `npm run db:seed` resets the demo data, so do not run it if you need to keep that database's data.
 
 Start the development server:
 
@@ -48,6 +49,7 @@ Useful commands:
 npm run typecheck
 npm run lint
 npm run build
+npm run db:setup
 npm start
 ```
 
