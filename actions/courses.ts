@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { courseSchema } from "@/lib/validation";
 import { processPayment, generateTransactionId } from "@/lib/services/mockPayment";
-import { getSalePrice } from "@/lib/course-pricing";
+import { getValidPromo, priceCourses } from "@/lib/promo-codes";
 
 export async function toggleWishlist(form: FormData) {
   const user=await requireUser("STUDENT"), courseId=String(form.get("courseId")??"");
@@ -63,16 +63,21 @@ export async function purchaseCourse(form: FormData) {
   if(!course) redirect("/catalog?error=Course+is+unavailable");
   const enrolled=await db.enrollment.findUnique({where:{userId_courseId:{userId:user.id,courseId}}});
   if(enrolled) redirect(`/student/courses/${courseId}/learn`);
-  const charge=getSalePrice(course.price,course.slug).current;
+  const promoCode=String(form.get("promoCode")??"").trim();
+  const promo=promoCode?await getValidPromo(promoCode):null;
+  if(promoCode&&!promo)redirect(`/checkout/${courseId}?error=${encodeURIComponent("That promo code is invalid, inactive, or expired.")}`);
+  const quote=priceCourses([course],promo??undefined), priced=quote.items[0], charge=priced.amount;
+  if(promo&&!priced.eligible)redirect(`/checkout/${courseId}?error=${encodeURIComponent("That promo code does not apply to this instructor’s courses.")}`);
   const payment=charge===0?{success:true as const,transactionId:generateTransactionId(),status:"completed" as const}:await processPayment({number:String(form.get("cardNumber")??""),expiry:String(form.get("expiry")??""),cvv:String(form.get("cvv")??""),holder:String(form.get("holder")??"")});
   if(!payment.success){
     const transactionId=payment.transactionId||generateTransactionId();
-    await db.order.create({data:{userId:user.id,courseId,amount:charge,status:"FAILED",payment:{create:{transactionId,status:"FAILED"}}}});
+    await db.order.create({data:{userId:user.id,courseId,amount:charge,discountAmount:priced.discountAmount,promoCodeId:priced.discountAmount?promo?.id:null,status:"FAILED",payment:{create:{transactionId,status:"FAILED"}}}});
     revalidatePath("/student/orders");revalidatePath("/instructor/sales");
     redirect(`/checkout/${courseId}?error=${encodeURIComponent("Payment could not be completed. The failed demo attempt was added to your order history.")}`);
   }
   const order=await db.$transaction(async tx=>{
-    const created=await tx.order.create({data:{userId:user.id,courseId,amount:charge,status:"COMPLETED",payment:{create:{transactionId:payment.transactionId,status:"COMPLETED"}},}});
+    const created=await tx.order.create({data:{userId:user.id,courseId,amount:charge,discountAmount:priced.discountAmount,promoCodeId:priced.discountAmount?promo?.id:null,status:"COMPLETED",payment:{create:{transactionId:payment.transactionId,status:"COMPLETED"}},}});
+    if(promo&&priced.discountAmount>0)await tx.promoCode.update({where:{id:promo.id},data:{usedCount:{increment:1}}});
     await tx.enrollment.create({data:{userId:user.id,courseId}});
     await tx.notification.create({data:{userId:user.id,title:"You’re enrolled",body:`Your purchase of ${course.title} was successful.`}});
     return created;
@@ -96,8 +101,13 @@ export async function purchaseCart(form: FormData) {
   const toPurchase = orderedCourses.filter((course) => !enrolledIds.has(course.id));
   if (!toPurchase.length) redirect("/student/courses");
 
-  const amounts = toPurchase.map((course) => getSalePrice(course.price, course.slug).current);
-  const total = amounts.reduce((sum, amount) => sum + amount, 0);
+  const promoCode=String(form.get("promoCode")??"").trim();
+  const promo=promoCode?await getValidPromo(promoCode):null;
+  if(promoCode&&!promo)redirect(`/checkout?courseIds=${encodeURIComponent(ids.join(","))}&error=${encodeURIComponent("That promo code is invalid, inactive, or expired.")}`);
+  const quote=priceCourses(toPurchase,promo??undefined);
+  if(promo&&!quote.items.some((item)=>item.eligible))redirect(`/checkout?courseIds=${encodeURIComponent(ids.join(","))}&error=${encodeURIComponent("That promo code does not apply to any course in this order.")}`);
+  const amounts=quote.items.map((item)=>item.amount);
+  const total=quote.total;
   const payment = total === 0
     ? { success: true as const, transactionId: generateTransactionId(), status: "completed" as const }
     : await processPayment({
@@ -116,6 +126,8 @@ export async function purchaseCart(form: FormData) {
             userId: user.id,
             courseId: course.id,
             amount: amounts[index],
+            discountAmount: quote.items[index].discountAmount,
+            promoCodeId: quote.items[index].discountAmount ? promo?.id : null,
             status: "FAILED",
             payment: { create: { transactionId: `${baseTransactionId}-${index + 1}`, status: "FAILED" } },
           },
@@ -134,6 +146,8 @@ export async function purchaseCart(form: FormData) {
           userId: user.id,
           courseId: course.id,
           amount: amounts[index],
+          discountAmount: quote.items[index].discountAmount,
+          promoCodeId: quote.items[index].discountAmount ? promo?.id : null,
           status: "COMPLETED",
           payment: { create: { transactionId: `${payment.transactionId}-${index + 1}`, status: "COMPLETED" } },
         },
@@ -143,6 +157,7 @@ export async function purchaseCart(form: FormData) {
         data: { userId: user.id, title: "You’re enrolled", body: `Your purchase of ${course.title} was successful.` },
       });
     }
+    if(promo&&quote.discountAmount>0)await tx.promoCode.update({where:{id:promo.id},data:{usedCount:{increment:1}}});
   });
 
   revalidatePath("/student");

@@ -4,6 +4,7 @@ import { purchaseCart } from "@/actions/courses";
 import { Alert } from "@/components/Message";
 import { CartPurchaseClear } from "@/components/Cart";
 import { PaymentFields } from "@/components/PaymentFields";
+import { CheckoutPromoProvider, PromoOrderTotal } from "@/components/CheckoutPromo";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getSalePrice } from "@/lib/course-pricing";
@@ -47,6 +48,7 @@ export default async function CartCheckout({ searchParams }: { searchParams: Pro
     <div className="eyebrow">One checkout</div>
     <h1 style={{ fontSize: 33, letterSpacing: "-1.5px", margin: "8px 0 5px" }}>Complete your purchase.</h1>
     <p className="small-note" style={{ fontSize: 13, marginBottom: 25 }}>One local demo payment covers every course below. No real charge or saved card details.</p>
+    <CheckoutPromoProvider courseIds={toPurchase.map((course) => course.id)}>
     <div className="split" style={{ gridTemplateColumns: "1.2fr .8fr" }}>
       <section className="panel">
         <h2 style={{ marginBottom: 17 }}>Payment details</h2>
@@ -69,12 +71,11 @@ export default async function CartCheckout({ searchParams }: { searchParams: Pro
           })}
         </div>
         <div style={{ height: 1, background: "var(--line)", margin: "14px 0" }} />
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, fontWeight: 800 }}>
-          <span>Total due</span><span>${total.toFixed(2)}</span>
-        </div>
+        <PromoOrderTotal baseTotal={total} />
         <p className="small-note" style={{ marginTop: 16 }}>{toPurchase.length} course{toPurchase.length === 1 ? "" : "s"} · lifetime access after payment.</p>
         <Link className="text-link" href="/cart">← Back to cart</Link>
       </aside>
     </div>
+    </CheckoutPromoProvider>
   </main>;
 }

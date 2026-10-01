@@ -1,0 +1,7 @@
+-- CreateTable
+CREATE TABLE "AnalyticsEvent" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "userAgent" TEXT NOT NULL,
+    "path" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

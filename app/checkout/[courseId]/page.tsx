@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { purchaseCourse } from "@/actions/courses";
 import { Alert } from "@/components/Message";
 import { PaymentFields } from "@/components/PaymentFields";
+import { CheckoutPromoProvider, PromoOrderTotal } from "@/components/CheckoutPromo";
 import { getSalePrice } from "@/lib/course-pricing";
 
 export default async function Checkout({
@@ -29,6 +30,7 @@ export default async function Checkout({
       <div className="eyebrow">One more step</div>
       <h1 style={{ fontSize: 33, letterSpacing: "-1.5px", margin: "8px 0 5px" }}>Make this course yours.</h1>
       <p className="small-note" style={{ fontSize: 13, marginBottom: 25 }}>Local demo checkout · no real charges or saved card details.</p>
+      <CheckoutPromoProvider courseIds={[course.id]}>
       <div className="split" style={{ gridTemplateColumns: "1.2fr .8fr" }}>
         <section className="panel">
           <h2 style={{ marginBottom: 17 }}>Payment details</h2>
@@ -40,16 +42,13 @@ export default async function Checkout({
           <h2 style={{ fontSize: 18, margin: "13px 0 4px" }}>{course.title}</h2>
           <p className="small-note">with {course.instructor.firstName} {course.instructor.lastName}</p>
           <div style={{ height: 1, background: "var(--line)", margin: "18px 0" }} />
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)" }}>
-            <span>Course price</span><span>{sale.original ? <><s className="old-price">${sale.original.toFixed(2)}</s> ${sale.current.toFixed(2)}</> : course.price === 0 ? "Free" : `$${sale.current.toFixed(2)}`}</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, fontWeight: 800, marginTop: 12 }}>
-            <span>Total due</span><span>{sale.current === 0 ? "$0.00" : `$${sale.current.toFixed(2)}`}</span>
-          </div>
+          {sale.original && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)", marginBottom: 8 }}><span>Course price</span><span><s className="old-price">${sale.original.toFixed(2)}</s></span></div>}
+          <PromoOrderTotal baseTotal={sale.current} />
           <p className="small-note" style={{ marginTop: 18 }}>You’ll get lifetime access to the course and every future lesson update.</p>
           <Link className="text-link" href={`/courses/${course.slug}`}>← Back to course</Link>
         </aside>
       </div>
+      </CheckoutPromoProvider>
     </main>
   );
 }

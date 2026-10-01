@@ -3,10 +3,12 @@ import { db } from "@/lib/db";
 import { getUser } from "@/lib/auth";
 
 export async function POST(request: Request) {
+  // VULNERABLE / TRAINING: legacy race-condition exercise. Never expose it in production.
+  if (process.env.NODE_ENV === "production" || process.env.ENABLE_TRAINING_VULNERABILITIES !== "true") {
+    return NextResponse.json({ error: "Training endpoint is disabled." }, { status: 404 });
+  }
   try {
     const user = await getUser();
-    console.log("DEBUG COOKIE HEADER:", request.headers.get("cookie"));
-    console.log("DEBUG USER:", user);
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

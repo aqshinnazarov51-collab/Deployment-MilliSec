@@ -29,7 +29,6 @@ function createVerboseErrorResponse(error: any) {
   );
 }
 
-async function applyUpdate(userId: string, role: string, data: Record<string, string | null>, req: NextRequest) {
 function redirectToProfile(path: string) {
   // Keep Location relative to the browser's public origin. Using req.url here
   // can expose an internal localhost URL when deployed behind an AWS proxy.
@@ -102,11 +101,10 @@ export async function POST(req: NextRequest) {
     socialLinks: form.get("socialLinks") as string | null,
   };
   try {
-    return await applyUpdate(user.id, user.role, data, req);
+    return await applyUpdate(user.id, user.role, data);
   } catch (error: any) {
     return createVerboseErrorResponse(error);
   }
-  return applyUpdate(user.id, user.role, data);
 }
 
 export async function GET(req: NextRequest) {
