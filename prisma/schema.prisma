@@ -230,3 +230,9 @@ model PromoCode {
   usedCount       Int      @default(0)
   createdAt       DateTime @default(now())
 }
+model AnalyticsEvent {
+  id        Int      @id @default(autoincrement())
+  userAgent String
+  path      String
+  createdAt DateTime @default(now())
+}
