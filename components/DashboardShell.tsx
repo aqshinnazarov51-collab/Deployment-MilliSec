@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { BookOpen, LayoutDashboard, Compass, Heart, ShoppingBag, Award, UserRound, Settings, LogOut, PlusCircle, Users, BarChart3, Star, Menu, X, ShieldCheck } from "lucide-react";
+import { BookOpen, LayoutDashboard, Compass, Heart, ShoppingBag, Award, UserRound, Settings, LogOut, PlusCircle, Users, BarChart3, Star, Menu, X, ShieldCheck, TicketPercent } from "lucide-react";
 import { logoutAction } from "@/actions/auth";
 
 const student = [["Dashboard", "/student", LayoutDashboard], ["My courses", "/student/courses", BookOpen], ["Browse courses", "/catalog", Compass], ["Favorites", "/student/wishlist", Heart], ["Orders", "/student/orders", ShoppingBag], ["Certificates", "/student/certificates", Award], ["Profile", "/student/profile", UserRound], ["Settings", "/student/settings", Settings]] as const;
-const instructor = [["Dashboard", "/instructor", LayoutDashboard], ["My courses", "/instructor/courses", BookOpen], ["Create course", "/instructor/courses/new", PlusCircle], ["Students", "/instructor/students", Users], ["Sales", "/instructor/sales", BarChart3], ["Reviews", "/instructor/reviews", Star], ["Profile", "/instructor/profile", UserRound], ["Settings", "/instructor/settings", Settings]] as const;
+const instructor = [["Dashboard", "/instructor", LayoutDashboard], ["My courses", "/instructor/courses", BookOpen], ["Create course", "/instructor/courses/new", PlusCircle], ["Promo codes", "/instructor/promos", TicketPercent], ["Students", "/instructor/students", Users], ["Sales", "/instructor/sales", BarChart3], ["Reviews", "/instructor/reviews", Star], ["Profile", "/instructor/profile", UserRound], ["Settings", "/instructor/settings", Settings]] as const;
 const admin = [["Admin console", "/admin", ShieldCheck]] as const;
 
 export function DashboardShell({ role, children }: { role: "STUDENT" | "INSTRUCTOR" | "ADMIN"; children: React.ReactNode }) {

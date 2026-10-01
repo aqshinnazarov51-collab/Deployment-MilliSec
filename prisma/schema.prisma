@@ -30,6 +30,7 @@ model User {
   settings       UserSettings?
   lessonProgress LessonProgress[]
   passwordResetTokens PasswordResetToken[]
+  promoCodes      PromoCode[]       @relation("InstructorPromoCodes")
 }
 
 model PasswordResetToken {
@@ -183,10 +184,13 @@ model Order {
   userId    String
   courseId  String
   amount    Int
+  discountAmount Int      @default(0)
+  promoCodeId String?
   status    String   @default("PENDING")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   payment   Payment?
+  promoCode PromoCode? @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
 }
 
@@ -238,9 +242,16 @@ model PromoCode {
   id              String   @id @default(cuid())
   code            String   @unique
   discountPercent Int
+  active          Boolean  @default(true)
+  expiresAt       DateTime?
+  instructorId    String?
+  instructor      User?    @relation("InstructorPromoCodes", fields: [instructorId], references: [id], onDelete: Cascade)
+  orders          Order[]
   used            Boolean  @default(false)
   usedCount       Int      @default(0)
   createdAt       DateTime @default(now())
+
+  @@index([instructorId, active])
 }
 model AnalyticsEvent {
   id        Int      @id @default(autoincrement())

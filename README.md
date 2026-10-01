@@ -73,6 +73,12 @@ Checkout is a local simulation. No real payment provider is connected. Card valu
 
 Every checkout page states “Test payment only — no real charge”. The database records the mock order, payment status, transaction ID, and enrollment, but no card data.
 
+## Promo codes and training lab
+
+Instructors can create and manage course-specific promo codes at `/instructor/promos`. Codes are checked for activity and expiration, and the server recalculates discounts from database prices during checkout. A promo created by an instructor only discounts that instructor's courses; cart discounts are applied per eligible course.
+
+The isolated Business Logic Misconfiguration lab is available at `/training/business-logic-misconfiguration` only when `ENABLE_TRAINING_VULNERABILITIES="true"` is set in a non-production environment. It deliberately trusts a browser-supplied discount and writes only to the demo database; it does not contact a payment provider. Production always returns 404 from training routes, even if the flag is set. The legacy race-condition training endpoint at `/api/promo/apply` is gated the same way.
+
 ## Database and migrations
 
 The Prisma schema lives in `prisma/schema.prisma`; the initial SQLite migration is in `prisma/migrations`. The schema keeps role, course level, and order status as validated strings so it can be migrated to PostgreSQL without depending on SQLite enum support.
@@ -93,6 +99,7 @@ To use PostgreSQL, change the datasource provider to `postgresql`, set a Postgre
 - `/courses/[slug]` — course details, curriculum, reviews, and enrollment
 - `/register`, `/login` — account creation and login
 - `/checkout/[courseId]` — mock checkout
+- `/checkout` — mock cart checkout
 - `/student` — learner dashboard
 - `/student/courses` — enrolled courses and learning progress
 - `/student/courses/[courseId]/learn/[lessonId]` — course player
@@ -100,6 +107,7 @@ To use PostgreSQL, change the datasource provider to `postgresql`, set a Postgre
 - `/student/profile`, `/student/settings`
 - `/instructor` — instructor overview and real course metrics
 - `/instructor/courses`, `/instructor/courses/new`, `/instructor/courses/[courseId]/edit`
+- `/instructor/promos` — instructor promo-code management
 - `/instructor/students`, `/instructor/sales`, `/instructor/reviews`, `/instructor/profile`, `/instructor/settings`
 - `/admin` — account, catalog, order, payment, and review overview
 

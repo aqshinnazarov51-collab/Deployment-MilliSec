@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PromoCodeFields, PromoCodeInput, useCheckoutPromo } from "@/components/CheckoutPromo";
 
 export function PaymentFields({
   action,
@@ -13,6 +14,7 @@ export function PaymentFields({
   courseIds?: string[];
   price: number;
 }) {
+  const { quote } = useCheckoutPromo();
   const [cardDigits, setCardDigits] = useState("");
   const formattedCardNumber = cardDigits.replace(/(.{4})/g, "$1 ").trim();
 
@@ -20,6 +22,8 @@ export function PaymentFields({
     <form action={action}>
       {courseId && <input type="hidden" name="courseId" value={courseId} />}
       {courseIds?.map((id) => <input key={id} type="hidden" name="courseIds" value={id} />)}
+      <PromoCodeFields />
+      <PromoCodeInput />
       <div className="field">
         <label htmlFor="payment-method">Payment method</label>
         <select id="payment-method" disabled defaultValue="mock"><option value="mock">Lumio test card - mock payment</option></select>
@@ -58,7 +62,7 @@ export function PaymentFields({
       <p className="small-note" id="card-help">
         The exact card number <strong>4000000000000002</strong> simulates a declined payment.
       </p>
-      <button className="button full">{price === 0 ? "Enroll for free" : `Pay $${price}`}</button>
+      <button className="button full">{(quote?.total ?? price) === 0 ? "Enroll for free" : `Pay $${(quote?.total ?? price).toFixed(2)}`}</button>
     </form>
   );
 }
