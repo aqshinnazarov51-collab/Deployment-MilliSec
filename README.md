@@ -122,4 +122,4 @@ prisma/       Relational schema, initial migration, and seed script
 public/       Static assets and local user image uploads
 ```
 
-The mock checkout, local disk uploads, and demo credentials are intended for learning and local development, not production deployment.
+The mock checkout and demo credentials are intended for learning and local development, not production deployment. Profile image files use `UPLOAD_DIR`; local development defaults to `public/uploads`, while production on EC2 defaults to `/var/lib/lumio/uploads` outside the application checkout. Ensure the app service user can write to that directory. For replaceable EC2 instances, set `UPLOAD_DIR` to a mounted persistent EBS or EFS directory (or use object storage such as S3). The default `public/uploads` path is suitable for local development only and may be ephemeral on managed/container deployments.
