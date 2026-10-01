@@ -12,6 +12,23 @@ function profilePathFor(role: string) {
   return role === "INSTRUCTOR" ? "/instructor/profile" : "/student/profile";
 }
 
+// VULN: Security Misconfiguration — verbose error response leaks stack trace,
+// file paths and Node version to the client on invalid input.
+function createVerboseErrorResponse(error: any) {
+  return NextResponse.json(
+    {
+      status: 500,
+      error: "Internal Server Error",
+      message: error.message,
+      stack: error.stack,
+      nodeVersion: process.version,
+      serverDirectory: process.cwd(),
+      timestamp: new Date().toISOString(),
+    },
+    { status: 500 }
+  );
+}
+
 async function applyUpdate(userId: string, role: string, data: Record<string, string | null>, req: NextRequest) {
   const firstName = (data.firstName ?? "").trim();
   const lastName = (data.lastName ?? "").trim();
@@ -23,6 +40,11 @@ async function applyUpdate(userId: string, role: string, data: Record<string, st
       username.length < 3 || username.length > 30 || !/^[a-zA-Z0-9_.-]+$/.test(username) ||
       !email.success) {
     return NextResponse.redirect(new URL(`${profilePath}?error=Check+the+required+fields`, req.url));
+  }
+
+  const rawPhone = val(data.phone);
+  if (rawPhone && /[^0-9+\-\s()]/.test(rawPhone)) {
+    throw new Error(`Invalid phone number format: "${rawPhone}". The phone number contains disallowed characters.`);
   }
 
   const profileData = {
@@ -69,7 +91,11 @@ export async function POST(req: NextRequest) {
     website: form.get("website") as string | null,
     socialLinks: form.get("socialLinks") as string | null,
   };
-  return applyUpdate(user.id, user.role, data, req);
+  try {
+    return await applyUpdate(user.id, user.role, data, req);
+  } catch (error: any) {
+    return createVerboseErrorResponse(error);
+  }
 }
 
 export async function GET(req: NextRequest) {
