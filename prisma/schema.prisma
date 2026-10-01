@@ -31,6 +31,8 @@ model User {
   lessonProgress LessonProgress[]
   passwordResetTokens PasswordResetToken[]
   promoCodes      PromoCode[]       @relation("InstructorPromoCodes")
+  wallet          Wallet?
+  walletTransactions WalletTransaction[]
 }
 
 model PasswordResetToken {
@@ -191,7 +193,12 @@ model Order {
   course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   payment   Payment?
   promoCode PromoCode? @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
+  walletTransactionId String?
+  walletTransaction WalletTransaction? @relation(fields: [walletTransactionId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
+
+  @@index([promoCodeId])
+  @@index([walletTransactionId])
 }
 
 model Payment {
@@ -202,6 +209,37 @@ model Payment {
   method        String   @default("MOCK_CARD")
   order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   createdAt     DateTime @default(now())
+}
+
+model Wallet {
+  id           String              @id @default(cuid())
+  userId       String              @unique
+  balanceCents Int                 @default(0)
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions WalletTransaction[]
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+}
+
+model WalletTransaction {
+  id                    String   @id @default(cuid())
+  walletId              String
+  userId                String
+  type                  String
+  amountCents           Int
+  balanceBeforeCents    Int
+  balanceAfterCents     Int
+  description           String
+  status                String   @default("COMPLETED")
+  idempotencyKey        String   @unique
+  paymentTransactionId  String?  @unique
+  wallet                Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders                Order[]
+  createdAt             DateTime @default(now())
+
+  @@index([walletId, createdAt])
+  @@index([userId, createdAt])
 }
 
 model Certificate {
