@@ -39,6 +39,7 @@ export function PaymentFields({
       {courseIds?.map((id) => <input key={id} type="hidden" name="courseIds" value={id} />)}
       {idempotencyKey && <input type="hidden" name="idempotencyKey" value={idempotencyKey} />}
       {topUpAmount && <input type="hidden" name="topUpAmount" value={topUpAmount} />}
+      {!topUpAmount && <input type="hidden" name="amount" value={total} />}
       {enablePromo && promoContext && <><PromoCodeFields /><PromoCodeInput /></>}
       {walletBalanceCents !== undefined && !topUpAmount && <fieldset className="panel" style={{ padding: 15, margin: "16px 0" }}>
         <legend style={{ fontWeight: 700 }}>Payment method</legend>

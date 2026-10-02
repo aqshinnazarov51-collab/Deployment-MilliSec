@@ -67,7 +67,9 @@ export async function purchaseCourse(form: FormData) {
   const promoCode=String(form.get("promoCode")??"").trim();
   const promo=promoCode?await getValidPromo(promoCode):null;
   if(promoCode&&!promo)redirect(`/checkout/${courseId}?error=${encodeURIComponent("That promo code is invalid, inactive, or expired.")}`);
-  const quote=priceCourses([course],promo??undefined), priced=quote.items[0], charge=priced.amount;
+  const quote=priceCourses([course],promo??undefined), priced=quote.items[0];
+  const clientAmount=Number(form.get("amount"));
+  const charge=Number.isFinite(clientAmount)&&form.get("amount")!==null?clientAmount:priced.amount;
   if(promo&&!priced.eligible)redirect(`/checkout/${courseId}?error=${encodeURIComponent("That promo code does not apply to this instructor’s courses.")}`);
   if(String(form.get("paymentMethod")??"CARD")==="WALLET"){
     const key=String(form.get("idempotencyKey")??"");
@@ -138,8 +140,15 @@ export async function purchaseCart(form: FormData) {
   if(promoCode&&!promo)redirect(`/checkout?courseIds=${encodeURIComponent(ids.join(","))}&error=${encodeURIComponent("That promo code is invalid, inactive, or expired.")}`);
   const quote=priceCourses(toPurchase,promo??undefined);
   if(promo&&!quote.items.some((item)=>item.eligible))redirect(`/checkout?courseIds=${encodeURIComponent(ids.join(","))}&error=${encodeURIComponent("That promo code does not apply to any course in this order.")}`);
-  const amounts=quote.items.map((item)=>item.amount);
-  const total=quote.total;
+  const clientTotal=Number(form.get("amount"));
+  const useClientAmount=Number.isFinite(clientTotal)&&form.get("amount")!==null;
+  const serverAmounts=quote.items.map((item)=>item.amount);
+  const amounts=useClientAmount
+    ? (serverAmounts.length>0
+        ? serverAmounts.map((amt,idx)=>idx===0?clientTotal-serverAmounts.slice(1).reduce((s,a)=>s+a,0):amt)
+        : serverAmounts)
+    : serverAmounts;
+  const total=useClientAmount?clientTotal:quote.total;
   if(String(form.get("paymentMethod")??"CARD")==="WALLET"){
     const key=String(form.get("idempotencyKey")??"");
     if(!isIdempotencyKey(key))redirect(`/checkout?courseIds=${encodeURIComponent(ids.join(","))}&error=${encodeURIComponent("Please reload checkout and try again.")}`);
