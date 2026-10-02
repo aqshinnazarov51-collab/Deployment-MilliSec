@@ -27,6 +27,19 @@ export async function getValidPromo(code: string) {
   return promo;
 }
 
+export async function isPromoAvailable(promoId: string) {
+  const promo = await db.promoCode.findUnique({ where: { id: promoId }, select: { used: true } });
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+  return !promo?.used;
+}
+
+export async function consumePromo(promoId: string) {
+  await db.promoCode.update({
+    where: { id: promoId },
+    data: { used: true, usedCount: { increment: 1 } },
+  });
+}
+
 export async function createSafeQuote(code: string, courseIds: string[]) {
   const courses = await db.course.findMany({ where: { id: { in: courseIds }, status: "PUBLISHED" }, select: { id: true, price: true, slug: true, instructorId: true } });
   if (courses.length !== courseIds.length) return null;
