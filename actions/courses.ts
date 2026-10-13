@@ -18,44 +18,150 @@ export async function toggleWishlist(form: FormData) {
   revalidatePath("/"); revalidatePath("/catalog"); revalidatePath(`/courses/${course.slug}`); revalidatePath("/student/wishlist");
 }
 export async function saveCourse(form: FormData) {
-  const user=await requireUser("INSTRUCTOR");
-  const courseId=String(form.get("courseId")??""),errorPath=courseId?`/instructor/courses/${courseId}/edit`:`/instructor/courses/new`;
-  let sections:unknown;
-  try { sections=JSON.parse(String(form.get("curriculum")??"[]")); } catch { redirect(`${errorPath}?error=Invalid+curriculum`); }
-  const parsed=courseSchema.safeParse({...Object.fromEntries(form.entries()),sections});
-  if(!parsed.success) redirect(`${errorPath}?error=${encodeURIComponent(parsed.error.issues[0].message)}`);
-  const v=parsed.data;
-  if(!await db.category.findUnique({where:{id:v.categoryId}}))redirect(`${errorPath}?error=Choose+a+valid+topic`);
-  if(courseId){
-    const owned=await db.course.findFirst({where:{id:courseId,instructorId:user.id}});
-    if(!owned) redirect("/instructor?error=Course+not+found");
-    await db.$transaction(async tx=>{
-      await tx.course.update({where:{id:courseId},data:{title:v.title,slug:slugify(v.title,courseId.slice(-5)),subtitle:v.subtitle,description:v.description,categoryId:v.categoryId,level:v.level,language:v.language,price:v.price,status:v.status,thumbnail:v.thumbnail||null}});
-      const current=await tx.section.findMany({where:{courseId},orderBy:{position:"asc"},include:{lessons:{orderBy:{position:"asc"}}}});
-      for(let i=0;i<v.sections.length;i++){
-        const desired=v.sections[i],section=current[i]?await tx.section.update({where:{id:current[i].id},data:{title:desired.title,position:i}}):await tx.section.create({data:{title:desired.title,position:i,courseId}});
-        const oldLessons=current[i]?.lessons??[];
-        for(let j=0;j<desired.lessons.length;j++){
-          const lesson=desired.lessons[j],fields={title:lesson.title,description:lesson.description,videoUrl:lesson.videoUrl||null,durationMinutes:lesson.durationMinutes,position:j};
-          if(oldLessons[j]) await tx.lesson.update({where:{id:oldLessons[j].id},data:fields});
-          else await tx.lesson.create({data:{...fields,sectionId:section.id}});
-        }
-        const removedLessons=oldLessons.slice(desired.lessons.length).map(l=>l.id);
-        if(removedLessons.length) await tx.lesson.deleteMany({where:{id:{in:removedLessons}}});
-      }
-      const removedSections=current.slice(v.sections.length).map(s=>s.id);
-      if(removedSections.length) await tx.section.deleteMany({where:{id:{in:removedSections}}});
-      if(v.status==="PUBLISHED"){
-        const learnerIds=await tx.enrollment.findMany({where:{courseId},select:{userId:true}});
-        if(learnerIds.length)await tx.notification.createMany({data:learnerIds.map(item=>({userId:item.userId,title:"Course updated",body:`${v.title} has a new update from your instructor.`}))});
-      }
-    });
-    revalidatePath(`/courses/${slugify(v.title,courseId.slice(-5))}`);
-    redirect("/instructor?notice=Course+updated");
+  const user = await requireUser("INSTRUCTOR");
+  const courseId = String(form.get("courseId") ?? "");
+  const errorPath = courseId ? `/instructor/courses/${courseId}/edit` : "/instructor/courses/new";
+  let sections: unknown;
+
+  try {
+    sections = JSON.parse(String(form.get("curriculum") ?? "[]"));
+  } catch {
+    redirect(`${errorPath}?error=${encodeURIComponent("The course outline could not be read. Review it and try again.")}`);
   }
-  const slug=slugify(v.title,Math.random().toString(36).slice(2,7));
-  const course=await db.course.create({data:{slug,title:v.title,subtitle:v.subtitle,description:v.description,categoryId:v.categoryId,level:v.level,language:v.language,price:v.price,status:v.status,thumbnail:v.thumbnail||null,instructorId:user.id,sections:{create:v.sections.map((s,i)=>({title:s.title,position:i,lessons:{create:s.lessons.map((l,j)=>({title:l.title,description:l.description,videoUrl:l.videoUrl||null,durationMinutes:l.durationMinutes,position:j}))}}))}}});
-  revalidatePath("/catalog"); redirect(`/courses/${course.slug}`);
+
+  const parsed = courseSchema.safeParse({ ...Object.fromEntries(form.entries()), sections });
+  if (!parsed.success) redirect(`${errorPath}?error=${encodeURIComponent(parsed.error.issues[0].message)}`);
+  const course = parsed.data;
+
+  let categoryExists = false;
+  try {
+    categoryExists = Boolean(await db.category.findUnique({ where: { id: course.categoryId }, select: { id: true } }));
+  } catch (error) {
+    console.error("Course category could not be checked", { userId: user.id, error });
+    redirect(`${errorPath}?error=${encodeURIComponent("We couldn't verify the selected topic. Please try again.")}`);
+  }
+  if (!categoryExists) redirect(`${errorPath}?error=${encodeURIComponent("Choose a valid topic")}`);
+
+  if (courseId) {
+    let owned = false;
+    try {
+      owned = Boolean(await db.course.findFirst({ where: { id: courseId, instructorId: user.id }, select: { id: true } }));
+    } catch (error) {
+      console.error("Course ownership could not be checked", { userId: user.id, courseId, error });
+      redirect(`${errorPath}?error=${encodeURIComponent("We couldn't verify course access. Please try again.")}`);
+    }
+    if (!owned) redirect("/instructor?error=Course+not+found");
+  }
+
+  let destination: string;
+  try {
+    if (courseId) {
+      const slug = slugify(course.title, courseId.slice(-5));
+      await db.$transaction(async (tx) => {
+        await tx.course.update({
+          where: { id: courseId },
+          data: {
+            title: course.title,
+            slug,
+            subtitle: course.subtitle,
+            description: course.description,
+            categoryId: course.categoryId,
+            level: course.level,
+            language: course.language,
+            price: course.price,
+            status: course.status,
+            thumbnail: course.thumbnail || null,
+          },
+        });
+
+        const current = await tx.section.findMany({
+          where: { courseId },
+          orderBy: { position: "asc" },
+          include: { lessons: { orderBy: { position: "asc" } } },
+        });
+        for (let i = 0; i < course.sections.length; i++) {
+          const desired = course.sections[i];
+          const section = current[i]
+            ? await tx.section.update({ where: { id: current[i].id }, data: { title: desired.title, position: i } })
+            : await tx.section.create({ data: { title: desired.title, position: i, courseId } });
+          const oldLessons = current[i]?.lessons ?? [];
+
+          for (let j = 0; j < desired.lessons.length; j++) {
+            const lesson = desired.lessons[j];
+            const fields = {
+              title: lesson.title,
+              description: lesson.description,
+              videoUrl: lesson.videoUrl || null,
+              durationMinutes: lesson.durationMinutes,
+              position: j,
+            };
+            if (oldLessons[j]) await tx.lesson.update({ where: { id: oldLessons[j].id }, data: fields });
+            else await tx.lesson.create({ data: { ...fields, sectionId: section.id } });
+          }
+
+          const removedLessons = oldLessons.slice(desired.lessons.length).map((lesson) => lesson.id);
+          if (removedLessons.length) await tx.lesson.deleteMany({ where: { id: { in: removedLessons } } });
+        }
+
+        const removedSections = current.slice(course.sections.length).map((section) => section.id);
+        if (removedSections.length) await tx.section.deleteMany({ where: { id: { in: removedSections } } });
+
+        if (course.status === "PUBLISHED") {
+          const learners = await tx.enrollment.findMany({ where: { courseId }, select: { userId: true } });
+          if (learners.length) {
+            await tx.notification.createMany({
+              data: learners.map((learner) => ({
+                userId: learner.userId,
+                title: "Course updated",
+                body: `${course.title} has a new update from your instructor.`,
+              })),
+            });
+          }
+        }
+      });
+      destination = "/instructor?notice=Course+updated";
+    } else {
+      const slug = slugify(course.title, Math.random().toString(36).slice(2, 7));
+      const created = await db.course.create({
+        data: {
+          slug,
+          title: course.title,
+          subtitle: course.subtitle,
+          description: course.description,
+          categoryId: course.categoryId,
+          level: course.level,
+          language: course.language,
+          price: course.price,
+          status: course.status,
+          thumbnail: course.thumbnail || null,
+          instructorId: user.id,
+          sections: {
+            create: course.sections.map((section, sectionIndex) => ({
+              title: section.title,
+              position: sectionIndex,
+              lessons: {
+                create: section.lessons.map((lesson, lessonIndex) => ({
+                  title: lesson.title,
+                  description: lesson.description,
+                  videoUrl: lesson.videoUrl || null,
+                  durationMinutes: lesson.durationMinutes,
+                  position: lessonIndex,
+                })),
+              },
+            })),
+          },
+        },
+      });
+      destination = `/courses/${created.slug}`;
+    }
+  } catch (error) {
+    console.error("Course could not be saved", { userId: user.id, courseId: courseId || null, error });
+    redirect(`${errorPath}?error=${encodeURIComponent("We couldn't save the course. Please try again. If the problem continues, contact support.")}`);
+  }
+
+  if (courseId) revalidatePath(`/courses/${slugify(course.title, courseId.slice(-5))}`);
+  else revalidatePath("/catalog");
+  redirect(destination);
 }
 function slugify(value:string,suffix:string){return `${value.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"").slice(0,55)}-${suffix}`;}
 export async function purchaseCourse(form: FormData) {

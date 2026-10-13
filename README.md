@@ -109,7 +109,9 @@ To use PostgreSQL, change the datasource provider to `postgresql`, set a Postgre
 - `/instructor/courses`, `/instructor/courses/new`, `/instructor/courses/[courseId]/edit`
 - `/instructor/promos` — instructor promo-code management
 - `/instructor/students`, `/instructor/sales`, `/instructor/reviews`, `/instructor/profile`, `/instructor/settings`
+- `/admin/login` — administrator-only sign in
 - `/admin` — account, catalog, order, payment, and review overview
+- `/admin/sales` — searchable sales report with status/date filters, sorting, pagination, and revenue metrics
 
 ## Server actions and API routes
 
@@ -130,4 +132,18 @@ prisma/       Relational schema, initial migration, and seed script
 public/       Static assets and local user image uploads
 ```
 
-The mock checkout and demo credentials are intended for learning and local development, not production deployment. Profile image files use `UPLOAD_DIR`; local development defaults to `public/uploads`, while production on EC2 defaults to `/var/lib/lumio/uploads` outside the application checkout. Ensure the app service user can write to that directory. For replaceable EC2 instances, set `UPLOAD_DIR` to a mounted persistent EBS or EFS directory (or use object storage such as S3). The default `public/uploads` path is suitable for local development only and may be ephemeral on managed/container deployments.
+The mock checkout and demo credentials are intended for learning and local development, not production deployment.
+
+### Production course saves and uploads
+
+Course creation saves its details and curriculum with a same-origin Next.js Server Action; it does not upload a course file. CORS and `APP_URL` do not control this request. `APP_URL` is used for password-reset links. Server Actions accept up to 10 MB so larger course outlines can be saved. If Nginx proxies the app, set `client_max_body_size 12m;` in the relevant `http`, `server`, or `location` block, then validate and reload Nginx. A smaller proxy limit can reject the request before it reaches Next.js.
+
+Profile image files use `UPLOAD_DIR`; local development defaults to `public/uploads`, while production on EC2 defaults to `/var/lib/lumio/uploads` outside the application checkout. Set an absolute writable path for the app service account, for example `UPLOAD_DIR="/var/lib/lumio/uploads"`, and create the directory with ownership for that account (replace the placeholders with the service user's actual name and group):
+
+```sh
+sudo install -d -o lumio -g lumio -m 0750 /var/lib/lumio/uploads
+```
+
+Replace `lumio` with the actual user and group configured for the app service.
+
+For replaceable EC2 instances, set `UPLOAD_DIR` to a mounted persistent EBS or EFS directory (or use object storage such as S3). The default `public/uploads` path is suitable for local development only and may be ephemeral on managed/container deployments.

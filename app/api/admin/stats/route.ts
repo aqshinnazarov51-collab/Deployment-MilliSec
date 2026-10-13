@@ -1,24 +1,27 @@
 import { NextResponse } from "next/server";
-import { verifyJwt } from "@/lib/jwt";
 import { db } from "@/lib/db";
+import { getUser } from "@/lib/auth";
 
-export async function GET(req: Request) {
-  const auth = req.headers.get("authorization") || "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
-  if (!token) return NextResponse.json({ error: "Missing token" }, { status: 401 });
-
-  const payload = verifyJwt(token);
-  if (!payload || payload.role !== "ADMIN") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+export async function GET() {
+  const headers = { "Cache-Control": "private, no-store" };
+  let user: Awaited<ReturnType<typeof getUser>>;
+  try {
+    user = await getUser();
+  } catch (error) {
+    console.error("Admin stats authentication failed", error);
+    return NextResponse.json({ error: "The admin report is temporarily unavailable" }, { status: 500, headers });
   }
+  if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401, headers });
+  if (user.role !== "ADMIN") return NextResponse.json({ error: "Administrator access required" }, { status: 403, headers });
 
-  const users = await db.user.findMany({
-    select: { id: true, email: true, role: true, firstName: true, lastName: true }
-  });
-
-  return NextResponse.json({
-    message: "Welcome, admin.",
-    userCount: users.length,
-    users
-  });
+  try {
+    const users = await db.user.findMany({
+      select: { id: true, email: true, role: true, firstName: true, lastName: true },
+      orderBy: { createdAt: "desc" },
+    });
+    return NextResponse.json({ message: "Welcome, admin.", userCount: users.length, users }, { headers });
+  } catch (error) {
+    console.error("Admin stats request failed", error);
+    return NextResponse.json({ error: "The admin report is temporarily unavailable" }, { status: 500, headers });
+  }
 }

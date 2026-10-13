@@ -12,32 +12,43 @@ export function AvatarUpload({ initialUrl, name }: { initialUrl: string | null; 
   const inputRef = useRef<HTMLInputElement>(null);
   const [url, setUrl] = useState(() => profilePhotoSource(initialUrl));
   const [message, setMessage] = useState("");
+  const [messageIsError, setMessageIsError] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
   const initials = name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase();
 
   async function upload(file?: File) {
     if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      setMessage("Choose an image under 2 MB.");
+      setMessageIsError(true);
+      if (inputRef.current) inputRef.current.value = "";
+      return;
+    }
     const preview = URL.createObjectURL(file);
     setUrl(preview);
     setImageFailed(false);
     setMessage("Uploading…");
+    setMessageIsError(false);
 
     try {
       const data = new FormData();
       data.set("avatar", file);
       const response = await fetch("/api/upload/avatar", { method: "POST", body: data });
-      const result = await response.json();
+      const result = await response.json().catch(() => ({} as { error?: string; url?: string }));
       URL.revokeObjectURL(preview);
-      if (!response.ok) throw new Error(result.error ?? "Upload failed");
+      if (!response.ok) throw new Error(result.error ?? `Upload failed (HTTP ${response.status}). Please try again.`);
+      if (typeof result.url !== "string") throw new Error("The server returned an invalid upload response. Please try again.");
 
       setUrl(`${result.url}?v=${Date.now()}`);
       setImageFailed(false);
       setMessage("Photo saved");
+      setMessageIsError(false);
     } catch (error) {
       URL.revokeObjectURL(preview);
       setUrl(profilePhotoSource(initialUrl));
       setImageFailed(false);
       setMessage(error instanceof Error ? error.message : "Upload failed. Please try again.");
+      setMessageIsError(true);
     } finally {
       if (inputRef.current) inputRef.current.value = "";
     }
@@ -45,15 +56,18 @@ export function AvatarUpload({ initialUrl, name }: { initialUrl: string | null; 
 
   async function remove() {
     setMessage("Removing…");
+    setMessageIsError(false);
     try {
       const response = await fetch("/api/upload/avatar", { method: "DELETE" });
-      const result = await response.json();
+      const result = await response.json().catch(() => ({} as { error?: string }));
       if (!response.ok) throw new Error(result.error ?? "Could not remove photo");
       setUrl("");
       setImageFailed(false);
       setMessage("Photo removed");
+      setMessageIsError(false);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not remove photo");
+      setMessageIsError(true);
     }
   }
 
@@ -70,7 +84,7 @@ export function AvatarUpload({ initialUrl, name }: { initialUrl: string | null; 
           {url && <button type="button" className="icon-button" aria-label="Remove photo" onClick={remove}><Trash2 size={14} /></button>}
         </div>
         <input ref={inputRef} hidden type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(event) => upload(event.target.files?.[0])} />
-        <div role="status" aria-live="polite" className="small-note" style={{ marginTop: 5 }}>{message || "JPG, PNG, WebP or GIF · up to 2 MB"}</div>
+        <div role={messageIsError ? "alert" : "status"} aria-live={messageIsError ? "assertive" : "polite"} className="small-note" style={{ marginTop: 5 }}>{message || "JPG, PNG, WebP or GIF · up to 2 MB"}</div>
       </div>
     </div>
   );

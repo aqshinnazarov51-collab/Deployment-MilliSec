@@ -34,11 +34,14 @@ export function CourseCard({ course, wishlisted = false }: { course: CourseView;
   const lessonCount = content?.lessons ?? course.sections?.reduce((sum: number, section) => sum + section.lessons.length, 0);
   const price = getSalePrice(course.price, course.slug);
   const badge = getCourseBadge(course.slug);
+  const cover = course.thumbnail?.startsWith("http://") || course.thumbnail?.startsWith("https://")
+    ? course.thumbnail
+    : getCourseCover(course.slug);
 
   return (
     <article className="course-card">
       <div className="course-art course-art-photo">
-        <img className="course-art-image" src={getCourseCover(course.slug)} alt={`${course.title} course cover photo`} loading="lazy" />
+        <img className="course-art-image" src={cover} alt={`${course.title} course cover photo`} loading="lazy" />
         {badge && <span className={`course-badge course-badge-${badge.toLowerCase()}`}>{badge}</span>}
         <form action={toggleWishlist}>
           <input type="hidden" name="courseId" value={course.id} />
@@ -60,7 +63,7 @@ export function CourseCard({ course, wishlisted = false }: { course: CourseView;
         </div>
         <div className="course-foot">
           <div><div className="course-price">{course.price === 0 ? "Free" : <>{price.original && <s className="old-price">${price.original}</s>}<strong>${price.current}</strong></>}</div><div className="course-instructor">{content?.instructor.join(" ") ?? `${course.instructor.firstName} ${course.instructor.lastName}`}</div></div>
-          <div className="course-card-actions"><AddToCart item={{id:course.id,slug:course.slug,title:course.title,price:price.current,cover:getCourseCover(course.slug)}}/><Link href={`/courses/${course.slug}`} className="button button-quiet button-small">View course</Link></div>
+          <div className="course-card-actions"><AddToCart item={{id:course.id,slug:course.slug,title:course.title,price:price.current,cover}}/><Link href={`/courses/${course.slug}`} className="button button-quiet button-small">View course</Link></div>
         </div>
       </div>
     </article>

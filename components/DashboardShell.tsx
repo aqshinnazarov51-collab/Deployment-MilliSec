@@ -8,7 +8,7 @@ import { logoutAction } from "@/actions/auth";
 
 const student = [["Dashboard", "/student", LayoutDashboard], ["My courses", "/student/courses", BookOpen], ["Browse courses", "/catalog", Compass], ["Favorites", "/student/wishlist", Heart], ["Orders", "/student/orders", ShoppingBag], ["Certificates", "/student/certificates", Award], ["Profile", "/student/profile", UserRound], ["Settings", "/student/settings", Settings]] as const;
 const instructor = [["Dashboard", "/instructor", LayoutDashboard], ["My courses", "/instructor/courses", BookOpen], ["Create course", "/instructor/courses/new", PlusCircle], ["Promo codes", "/instructor/promos", TicketPercent], ["Students", "/instructor/students", Users], ["Sales", "/instructor/sales", BarChart3], ["Reviews", "/instructor/reviews", Star], ["Profile", "/instructor/profile", UserRound], ["Settings", "/instructor/settings", Settings]] as const;
-const admin = [["Admin console", "/admin", ShieldCheck]] as const;
+const admin = [["Admin console", "/admin", ShieldCheck], ["Sales", "/admin/sales", BarChart3]] as const;
 
 export function DashboardShell({ role, children }: { role: "STUDENT" | "INSTRUCTOR" | "ADMIN"; children: React.ReactNode }) {
   const pathname = usePathname();

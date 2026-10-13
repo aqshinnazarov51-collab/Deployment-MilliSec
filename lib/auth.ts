@@ -26,6 +26,12 @@ export async function requireUser(role?: "STUDENT" | "INSTRUCTOR" | "ADMIN") {
   if (role && user.role !== role && user.role !== "ADMIN") redirect(user.role === "INSTRUCTOR" ? "/instructor" : "/student");
   return user;
 }
+export async function requireAdmin() {
+  const user = await getUser();
+  if (!user) redirect("/admin/login");
+  if (user.role !== "ADMIN") redirect("/");
+  return user;
+}
 export async function clearSession() {
   const jar = await cookies(); const token = jar.get(COOKIE)?.value;
   if (token) await db.session.deleteMany({ where:{ tokenHash:hash(token) } });

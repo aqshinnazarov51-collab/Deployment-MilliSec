@@ -1,58 +1,214 @@
 "use client";
+
 import { useState } from "react";
+import type { FormEvent } from "react";
 import { ChevronDown, ChevronUp, GripVertical, Plus, Trash2 } from "lucide-react";
 import { saveCourse } from "@/actions/courses";
 import { courseCoverChoices } from "@/lib/course-covers";
 
-type LessonDraft = { title:string; description:string; videoUrl:string; durationMinutes:number };
-type SectionDraft = { title:string; lessons:LessonDraft[] };
-type InitialCourse = { id?:string; title?:string; subtitle?:string; description?:string; categoryId?:string; level?:string; language?:string; price?:number; status?:string; thumbnail?:string|null; sections?:{title:string;lessons:{title:string;description:string;videoUrl:string|null;durationMinutes:number}[]}[] };
+type LessonDraft = { title: string; description: string; videoUrl: string; durationMinutes: number };
+type SectionDraft = { title: string; lessons: LessonDraft[] };
+type InitialCourse = {
+  id?: string;
+  title?: string;
+  subtitle?: string;
+  description?: string;
+  categoryId?: string;
+  level?: string;
+  language?: string;
+  price?: number;
+  status?: string;
+  thumbnail?: string | null;
+  sections?: { title: string; lessons: { title: string; description: string; videoUrl: string | null; durationMinutes: number }[] }[];
+};
 
-export function CourseEditor({categories,initial}:{categories:{id:string;name:string}[];initial?:InitialCourse}){
-  const [sections,setSections]=useState<SectionDraft[]>(initial?.sections?.map(section=>({title:section.title,lessons:section.lessons.map(lesson=>({title:lesson.title,description:lesson.description,videoUrl:lesson.videoUrl??"",durationMinutes:lesson.durationMinutes}))}))??[{title:"Getting started",lessons:[{title:"Welcome to the course",description:"",videoUrl:"",durationMinutes:8}]}]);
-  const [thumb,setThumb]=useState(initial?.thumbnail??courseCoverChoices[0].url);
-  const [coverUrl,setCoverUrl]=useState("");
-  const [coverPreview,setCoverPreview]=useState<{status?:number;contentType?:string;preview?:string;error?:string}|null>(null);
-  const [coverLoading,setCoverLoading]=useState(false);
-  async function previewCoverUrl(){
-    if(!coverUrl.trim())return;
-    setCoverLoading(true);setCoverPreview(null);
-    try{
-      const response=await fetch("/api/courses/thumbnail-preview",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:coverUrl})});
-      const result=await response.json();
-      if(response.ok&&result.success){setCoverPreview(result);setThumb(coverUrl);}
-      else setCoverPreview({error:result.error??"Could not fetch that URL"});
-    }catch(error){setCoverPreview({error:error instanceof Error?error.message:"Request failed"});}
-    finally{setCoverLoading(false);}
+const MAX_CURRICULUM_BYTES = 9 * 1024 * 1024;
+
+export function CourseEditor({ categories, initial }: { categories: { id: string; name: string }[]; initial?: InitialCourse }) {
+  const [sections, setSections] = useState<SectionDraft[]>(
+    initial?.sections?.map((section) => ({
+      title: section.title,
+      lessons: section.lessons.map((lesson) => ({
+        title: lesson.title,
+        description: lesson.description,
+        videoUrl: lesson.videoUrl ?? "",
+        durationMinutes: lesson.durationMinutes,
+      })),
+    })) ?? [{ title: "Getting started", lessons: [{ title: "Welcome to the course", description: "", videoUrl: "", durationMinutes: 8 }] }],
+  );
+  const initialCover = initial?.thumbnail?.startsWith("http://") || initial?.thumbnail?.startsWith("https://") ? initial.thumbnail : "";
+  const [thumbnail, setThumbnail] = useState(initial?.thumbnail ?? courseCoverChoices[0].url);
+  const [coverUrl, setCoverUrl] = useState(initialCover);
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState(initialCover);
+  const [coverError, setCoverError] = useState("");
+  const [saveError, setSaveError] = useState("");
+
+  function previewCoverUrl() {
+    try {
+      const parsed = new URL(coverUrl.trim());
+      if (!["https:", "http:"].includes(parsed.protocol) || !parsed.hostname || parsed.username || parsed.password) {
+        throw new Error("Use a public HTTP or HTTPS image URL.");
+      }
+      setThumbnail(parsed.toString());
+      setCoverPreviewUrl(parsed.toString());
+      setCoverError("");
+    } catch (error) {
+      setCoverError(error instanceof Error ? error.message : "Enter a valid HTTP or HTTPS image URL.");
+      setCoverPreviewUrl("");
+    }
   }
-  function updateSection(index:number,title:string){setSections(prev=>prev.map((s,i)=>i===index?{...s,title}:s));}
-  function updateLesson(si:number,li:number,key:keyof LessonDraft,value:string){setSections(prev=>prev.map((s,i)=>i===si?{...s,lessons:s.lessons.map((l,j)=>{if(j!==li)return l;return key==="durationMinutes"?{...l,durationMinutes:Number(value)}:{...l,[key]:value} as LessonDraft;})}:s));}
-  function shiftSection(index:number,step:number){const to=index+step;if(to<0||to>=sections.length)return;setSections(prev=>{const copy=[...prev];[copy[index],copy[to]]=[copy[to],copy[index]];return copy;});}
-  function shiftLesson(si:number,index:number,step:number){const to=index+step;if(to<0||to>=sections[si].lessons.length)return;setSections(prev=>prev.map((s,i)=>{if(i!==si)return s;const lessons=[...s.lessons];[lessons[index],lessons[to]]=[lessons[to],lessons[index]];return {...s,lessons};}));}
-  return <form action={saveCourse} className="panel">
-    <input type="hidden" name="courseId" value={initial?.id??""}/><input type="hidden" name="curriculum" value={JSON.stringify(sections)}/><input type="hidden" name="thumbnail" value={thumb}/>
-    <h2 style={{marginBottom:18}}>Course details</h2>
-    <div className="field"><label>Course title</label><input name="title" required minLength={5} maxLength={100} defaultValue={initial?.title} placeholder="What will learners be able to do?"/></div>
-    <div className="field"><label>Short description</label><input name="subtitle" required minLength={5} maxLength={180} defaultValue={initial?.subtitle} placeholder="A clear, specific promise to your learners"/></div>
-    <div className="field"><label>About this course</label><textarea name="description" required minLength={30} maxLength={6000} defaultValue={initial?.description} placeholder="Share what learners will explore, build, or understand."/></div>
-    <div className="form-grid"><div className="field"><label>Topic</label><select name="categoryId" required defaultValue={initial?.categoryId??""}><option value="" disabled>Select a topic</option>{categories.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></div><div className="field"><label>Experience level</label><select name="level" defaultValue={initial?.level??"BEGINNER"}><option value="BEGINNER">Beginner</option><option value="INTERMEDIATE">Intermediate</option><option value="ADVANCED">Advanced</option></select></div></div>
-    <div className="form-grid"><div className="field"><label>Price (USD)</label><input name="price" type="number" min="0" max="100000" defaultValue={initial?.price??49} required/></div><div className="field"><label>Language</label><input name="language" defaultValue={initial?.language??"English"} required/></div></div>
-    <div className="field"><label>Course cover</label><div className="choice-row" style={{flexWrap:"wrap"}}>{courseCoverChoices.map(item=><button key={item.url} type="button" aria-label={`Choose ${item.label} cover`} aria-pressed={thumb===item.url} onClick={()=>setThumb(item.url)} style={{position:"relative",width:94,height:58,padding:0,overflow:"hidden",borderRadius:9,border:thumb===item.url?"3px solid var(--brand)":"1px solid var(--line)",cursor:"pointer"}}><span style={{width:"100%",height:"100%",display:"grid",placeItems:"center",background:item.url.split("|")[1],fontSize:23,color:"#4e5c75"}}>{item.url.split("|")[0]}</span><span style={{position:"absolute",inset:"auto 0 0",padding:"3px 5px",background:"linear-gradient(transparent,rgba(0,0,0,.75))",color:"white",fontSize:9,textAlign:"left"}}>{item.label}</span></button>)}</div><p className="small-note">Choose an icon and background color for your course card.</p>
-      <div style={{marginTop:14}}>
-        <label htmlFor="cover-url-input" style={{fontSize:13,fontWeight:600}}>Or import a cover from a URL</label>
-        <div style={{display:"flex",gap:8,marginTop:6}}>
-          <input id="cover-url-input" type="text" value={coverUrl} onChange={e=>setCoverUrl(e.target.value)} placeholder="https://example.com/cover.jpg" style={{flex:1}}/>
-          <button type="button" className="button button-outline" onClick={previewCoverUrl} disabled={coverLoading||!coverUrl.trim()}>{coverLoading?"Checking…":"Preview"}</button>
-        </div>
-        {coverPreview?.error&&<p className="small-note" role="alert" style={{color:"#b42318",marginTop:6}}>{coverPreview.error}</p>}
-        {coverPreview?.status&&<p className="small-note" role="status" style={{marginTop:6}}>Fetched · status {coverPreview.status} · {coverPreview.contentType}</p>}
+
+  function updateSection(index: number, title: string) {
+    setSections((previous) => previous.map((section, currentIndex) => currentIndex === index ? { ...section, title } : section));
+  }
+
+  function updateLesson(sectionIndex: number, lessonIndex: number, key: keyof LessonDraft, value: string) {
+    setSections((previous) => previous.map((section, currentSection) => currentSection === sectionIndex
+      ? {
+          ...section,
+          lessons: section.lessons.map((lesson, currentLesson) => {
+            if (currentLesson !== lessonIndex) return lesson;
+            return key === "durationMinutes" ? { ...lesson, durationMinutes: Number(value) } : { ...lesson, [key]: value };
+          }),
+        }
+      : section));
+  }
+
+  function shiftSection(index: number, step: number) {
+    const destination = index + step;
+    if (destination < 0 || destination >= sections.length) return;
+    setSections((previous) => {
+      const next = [...previous];
+      [next[index], next[destination]] = [next[destination], next[index]];
+      return next;
+    });
+  }
+
+  function shiftLesson(sectionIndex: number, index: number, step: number) {
+    const destination = index + step;
+    if (destination < 0 || destination >= sections[sectionIndex].lessons.length) return;
+    setSections((previous) => previous.map((section, currentIndex) => {
+      if (currentIndex !== sectionIndex) return section;
+      const lessons = [...section.lessons];
+      [lessons[index], lessons[destination]] = [lessons[destination], lessons[index]];
+      return { ...section, lessons };
+    }));
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    if (coverError && coverPreviewUrl && coverPreviewUrl === thumbnail) {
+      event.preventDefault();
+      setSaveError("Choose a working cover URL or select one of the preset covers before saving.");
+      return;
+    }
+    const curriculumBytes = new TextEncoder().encode(JSON.stringify(sections)).byteLength;
+    if (curriculumBytes > MAX_CURRICULUM_BYTES) {
+      event.preventDefault();
+      setSaveError("This course outline is too large to send at once. Shorten some lesson descriptions and try again.");
+      return;
+    }
+    setSaveError("");
+  }
+
+  return (
+    <form action={saveCourse} onSubmit={handleSubmit} className="panel">
+      <input type="hidden" name="courseId" value={initial?.id ?? ""} />
+      <input type="hidden" name="curriculum" value={JSON.stringify(sections)} />
+      <input type="hidden" name="thumbnail" value={thumbnail} />
+      {saveError && <div className="alert" role="alert" aria-live="assertive">{saveError}</div>}
+
+      <h2 style={{ marginBottom: 18 }}>Course details</h2>
+      <div className="field"><label>Course title</label><input name="title" required minLength={5} maxLength={100} defaultValue={initial?.title} placeholder="What will learners be able to do?" /></div>
+      <div className="field"><label>Short description</label><input name="subtitle" required minLength={5} maxLength={180} defaultValue={initial?.subtitle} placeholder="A clear, specific promise to your learners" /></div>
+      <div className="field"><label>About this course</label><textarea name="description" required minLength={30} maxLength={6000} defaultValue={initial?.description} placeholder="Share what learners will explore, build, or understand." /></div>
+
+      <div className="form-grid">
+        <div className="field"><label>Topic</label><select name="categoryId" required defaultValue={initial?.categoryId ?? ""}><option value="" disabled>Select a topic</option>{categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</select></div>
+        <div className="field"><label>Experience level</label><select name="level" defaultValue={initial?.level ?? "BEGINNER"}><option value="BEGINNER">Beginner</option><option value="INTERMEDIATE">Intermediate</option><option value="ADVANCED">Advanced</option></select></div>
       </div>
-      </div><div className="field"><label>Publish status</label><select name="status" defaultValue={initial?.status??"DRAFT"}><option value="DRAFT">Draft — only you can see it</option><option value="PUBLISHED">Published — visible in the catalog</option><option value="HIDDEN">Hidden — temporarily unavailable</option></select></div>
-    <div className="panel" style={{background:"var(--wash)",padding:15}}><div className="panel-header"><h3>Course curriculum</h3><button type="button" className="button button-outline button-small" onClick={()=>setSections(prev=>[...prev,{title:`Section ${prev.length+1}`,lessons:[{title:"New lesson",description:"",videoUrl:"",durationMinutes:8}]}])}><Plus size={14}/> Add section</button></div>
-      {sections.map((section,si)=><div key={si} className="panel" style={{padding:13,marginBottom:10}}><div style={{display:"flex",gap:6,alignItems:"center"}}><GripVertical size={15} color="#9aa4b5"/><input aria-label="Section title" value={section.title} onChange={e=>updateSection(si,e.target.value)} style={{flex:1,padding:9,border:"1px solid var(--line)",borderRadius:8}}/><button type="button" title="Move section up" disabled={si===0} className="icon-button" onClick={()=>shiftSection(si,-1)}><ChevronUp size={14}/></button><button type="button" title="Move section down" disabled={si===sections.length-1} className="icon-button" onClick={()=>shiftSection(si,1)}><ChevronDown size={14}/></button><button type="button" title="Delete section" onClick={()=>setSections(prev=>prev.filter((_,i)=>i!==si))} className="icon-button"><Trash2 size={14}/></button></div>
-        {section.lessons.map((lesson,li)=><div key={li} style={{padding:"10px 0 0 18px",display:"grid",gridTemplateColumns:"minmax(0,1fr) 70px 95px",gap:7}}><input aria-label="Lesson title" value={lesson.title} onChange={e=>updateLesson(si,li,"title",e.target.value)} style={{padding:8,border:"1px solid var(--line)",borderRadius:8}}/><input aria-label="Duration in minutes" type="number" min="1" value={lesson.durationMinutes} onChange={e=>updateLesson(si,li,"durationMinutes",e.target.value)} style={{padding:8,border:"1px solid var(--line)",borderRadius:8}}/><div style={{display:"flex",gap:2}}><button type="button" title="Move lesson up" disabled={li===0} className="icon-button" onClick={()=>shiftLesson(si,li,-1)}><ChevronUp size={13}/></button><button type="button" title="Move lesson down" disabled={li===section.lessons.length-1} className="icon-button" onClick={()=>shiftLesson(si,li,1)}><ChevronDown size={13}/></button><button type="button" title="Delete lesson" onClick={()=>setSections(prev=>prev.map((s,i)=>i===si?{...s,lessons:s.lessons.filter((_,j)=>j!==li)}:s))} className="icon-button"><Trash2 size={13}/></button></div><textarea aria-label="Lesson description" value={lesson.description} onChange={e=>updateLesson(si,li,"description",e.target.value)} placeholder="Lesson description" style={{gridColumn:"1 / 4",minHeight:55,padding:8,border:"1px solid var(--line)",borderRadius:8}}/><input aria-label="Lesson video URL" value={lesson.videoUrl} onChange={e=>updateLesson(si,li,"videoUrl",e.target.value)} placeholder="Video URL (optional)" style={{gridColumn:"1 / 4",padding:8,border:"1px solid var(--line)",borderRadius:8}}/></div>)}
-        <button type="button" className="text-link" style={{border:0,background:"none",margin:"10px 0 0 18px"}} onClick={()=>setSections(prev=>prev.map((s,i)=>i===si?{...s,lessons:[...s.lessons,{title:"New lesson",description:"",videoUrl:"",durationMinutes:8}]}:s))}><Plus size={13} style={{display:"inline",verticalAlign:"-3px"}}/> Add lesson</button>
-      </div>)}
-    </div><div className="small-note" style={{margin:"12px 0 18px"}}>Your course information and curriculum are saved to the database when you save.</div><button className="button">{initial?.id?"Save course changes":"Create course"}</button>
-  </form>;
+      <div className="form-grid">
+        <div className="field"><label>Price (USD)</label><input name="price" type="number" min="0" max="100000" defaultValue={initial?.price ?? 49} required /></div>
+        <div className="field"><label>Language</label><input name="language" defaultValue={initial?.language ?? "English"} required /></div>
+      </div>
+
+      <div className="field">
+        <label>Course cover</label>
+        <div className="choice-row" style={{ flexWrap: "wrap" }}>
+          {courseCoverChoices.map((choice) => (
+            <button
+              key={choice.url}
+              type="button"
+              aria-label={`Choose ${choice.label} cover`}
+              aria-pressed={thumbnail === choice.url}
+              onClick={() => {
+                setThumbnail(choice.url);
+                setCoverPreviewUrl("");
+                setCoverError("");
+              }}
+              style={{ position: "relative", width: 94, height: 58, padding: 0, overflow: "hidden", borderRadius: 9, border: thumbnail === choice.url ? "3px solid var(--brand)" : "1px solid var(--line)", cursor: "pointer" }}
+            >
+              <span style={{ width: "100%", height: "100%", display: "grid", placeItems: "center", background: choice.url.split("|")[1], fontSize: 23, color: "#4e5c75" }}>{choice.url.split("|")[0]}</span>
+              <span style={{ position: "absolute", inset: "auto 0 0", padding: "3px 5px", background: "linear-gradient(transparent,rgba(0,0,0,.75))", color: "white", fontSize: 9, textAlign: "left" }}>{choice.label}</span>
+            </button>
+          ))}
+        </div>
+        <p className="small-note">Choose an icon and background color for your course card.</p>
+        <div style={{ marginTop: 14 }}>
+          <label htmlFor="cover-url-input" style={{ fontSize: 13, fontWeight: 600 }}>Or use a cover image URL</label>
+          <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+            <input id="cover-url-input" type="url" value={coverUrl} onChange={(event) => setCoverUrl(event.target.value)} placeholder="https://example.com/cover.jpg" style={{ flex: 1 }} />
+            <button type="button" className="button button-outline" onClick={previewCoverUrl} disabled={!coverUrl.trim()}>Preview</button>
+          </div>
+          {coverError && <p className="small-note" role="alert" style={{ color: "#b42318", marginTop: 6 }}>{coverError}</p>}
+          {coverPreviewUrl && (
+            <div style={{ marginTop: 10, maxWidth: 260 }}>
+              <img
+                src={coverPreviewUrl}
+                alt="Course cover preview"
+                onError={() => setCoverError("The image could not be loaded. Check the URL and try another image.")}
+                style={{ display: "block", width: "100%", maxHeight: 150, objectFit: "cover", borderRadius: 8, border: "1px solid var(--line)" }}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="field"><label>Publish status</label><select name="status" defaultValue={initial?.status ?? "DRAFT"}><option value="DRAFT">Draft — only you can see it</option><option value="PUBLISHED">Published — visible in the catalog</option><option value="HIDDEN">Hidden — temporarily unavailable</option></select></div>
+
+      <div className="panel" style={{ background: "var(--wash)", padding: 15 }}>
+        <div className="panel-header">
+          <h3>Course curriculum</h3>
+          <button type="button" className="button button-outline button-small" onClick={() => setSections((previous) => [...previous, { title: `Section ${previous.length + 1}`, lessons: [{ title: "New lesson", description: "", videoUrl: "", durationMinutes: 8 }] }])}><Plus size={14} /> Add section</button>
+        </div>
+        {sections.map((section, sectionIndex) => (
+          <div key={sectionIndex} className="panel" style={{ padding: 13, marginBottom: 10 }}>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <GripVertical size={15} color="#9aa4b5" />
+              <input aria-label="Section title" value={section.title} onChange={(event) => updateSection(sectionIndex, event.target.value)} style={{ flex: 1, padding: 9, border: "1px solid var(--line)", borderRadius: 8 }} />
+              <button type="button" title="Move section up" disabled={sectionIndex === 0} className="icon-button" onClick={() => shiftSection(sectionIndex, -1)}><ChevronUp size={14} /></button>
+              <button type="button" title="Move section down" disabled={sectionIndex === sections.length - 1} className="icon-button" onClick={() => shiftSection(sectionIndex, 1)}><ChevronDown size={14} /></button>
+              <button type="button" title="Delete section" onClick={() => setSections((previous) => previous.filter((_, index) => index !== sectionIndex))} className="icon-button"><Trash2 size={14} /></button>
+            </div>
+            {section.lessons.map((lesson, lessonIndex) => (
+              <div key={lessonIndex} style={{ padding: "10px 0 0 18px", display: "grid", gridTemplateColumns: "minmax(0,1fr) 70px 95px", gap: 7 }}>
+                <input aria-label="Lesson title" value={lesson.title} onChange={(event) => updateLesson(sectionIndex, lessonIndex, "title", event.target.value)} style={{ padding: 8, border: "1px solid var(--line)", borderRadius: 8 }} />
+                <input aria-label="Duration in minutes" type="number" min="1" value={lesson.durationMinutes} onChange={(event) => updateLesson(sectionIndex, lessonIndex, "durationMinutes", event.target.value)} style={{ padding: 8, border: "1px solid var(--line)", borderRadius: 8 }} />
+                <div style={{ display: "flex", gap: 2 }}>
+                  <button type="button" title="Move lesson up" disabled={lessonIndex === 0} className="icon-button" onClick={() => shiftLesson(sectionIndex, lessonIndex, -1)}><ChevronUp size={13} /></button>
+                  <button type="button" title="Move lesson down" disabled={lessonIndex === section.lessons.length - 1} className="icon-button" onClick={() => shiftLesson(sectionIndex, lessonIndex, 1)}><ChevronDown size={13} /></button>
+                  <button type="button" title="Delete lesson" onClick={() => setSections((previous) => previous.map((current, index) => index === sectionIndex ? { ...current, lessons: current.lessons.filter((_, itemIndex) => itemIndex !== lessonIndex) } : current))} className="icon-button"><Trash2 size={13} /></button>
+                </div>
+                <textarea aria-label="Lesson description" value={lesson.description} onChange={(event) => updateLesson(sectionIndex, lessonIndex, "description", event.target.value)} placeholder="Lesson description" style={{ gridColumn: "1 / 4", minHeight: 55, padding: 8, border: "1px solid var(--line)", borderRadius: 8 }} />
+                <input aria-label="Lesson video URL" value={lesson.videoUrl} onChange={(event) => updateLesson(sectionIndex, lessonIndex, "videoUrl", event.target.value)} placeholder="Video URL (optional)" style={{ gridColumn: "1 / 4", padding: 8, border: "1px solid var(--line)", borderRadius: 8 }} />
+              </div>
+            ))}
+            <button type="button" className="text-link" style={{ border: 0, background: "none", margin: "10px 0 0 18px" }} onClick={() => setSections((previous) => previous.map((current, index) => index === sectionIndex ? { ...current, lessons: [...current.lessons, { title: "New lesson", description: "", videoUrl: "", durationMinutes: 8 }] } : current))}><Plus size={13} style={{ display: "inline", verticalAlign: "-3px" }} /> Add lesson</button>
+          </div>
+        ))}
+      </div>
+
+      <div className="small-note" style={{ margin: "12px 0 18px" }}>Your course information and curriculum are saved to the database when you save.</div>
+      <button className="button">{initial?.id ? "Save course changes" : "Create course"}</button>
+    </form>
+  );
 }

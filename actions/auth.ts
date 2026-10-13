@@ -37,4 +37,34 @@ export async function loginAction(form: FormData) {
   const next=String(form.get("next")??"");
   redirect(next.startsWith("/")&&!next.startsWith("//")&&!next.includes("\\")?next:homeForRole(user.role));
 }
+export async function adminLoginAction(form: FormData) {
+  const email = emailSchema.safeParse(form.get("email"));
+  const password = String(form.get("password") ?? "");
+  if (!email.success || !password) redirect(`/admin/login?error=${encodeURIComponent("Enter a valid email and password")}`);
+
+  const now = Date.now();
+  const key = `admin:${email.data}`;
+  const attempt = attempts.get(key);
+  if (attempt && attempt.reset > now && attempt.count >= 8) {
+    redirect(`/admin/login?error=${encodeURIComponent("Too many attempts. Try again in a few minutes.")}`);
+  }
+
+  let user;
+  let valid = false;
+  try {
+    user = await db.user.findUnique({ where: { email: email.data } });
+    valid = Boolean(user && user.role === "ADMIN" && !user.blocked && await bcrypt.compare(password, user.passwordHash));
+  } catch (error) {
+    console.error("Administrator sign in failed", error);
+    redirect(`/admin/login?error=${encodeURIComponent("Sign in is temporarily unavailable. Please try again.")}`);
+  }
+  if (!valid || !user) {
+    attempts.set(key, { count: attempt && attempt.reset > now ? attempt.count + 1 : 1, reset: now + 10 * 60_000 });
+    redirect(`/admin/login?error=${encodeURIComponent("Email or password is incorrect")}`);
+  }
+
+  attempts.delete(key);
+  await createSession(user.id, form.get("remember") === "on");
+  redirect("/admin");
+}
 export async function logoutAction() { await clearSession(); redirect("/"); }
