@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { courseSchema } from "@/lib/validation";
 import { processPayment, generateTransactionId } from "@/lib/services/mockPayment";
-import { getValidPromo, priceCourses, isPromoAvailable, consumePromo } from "@/lib/promo-codes";
+import { getValidPromo, priceCourses, claimPromo } from "@/lib/promo-codes";
 import { isIdempotencyKey } from "@/lib/wallet-money";
 
 export async function toggleWishlist(form: FormData) {
@@ -174,19 +174,14 @@ export async function purchaseCourse(form: FormData) {
   const promo=promoCode?await getValidPromo(promoCode):null;
   if(promoCode&&!promo)redirect(`/checkout/${courseId}?error=${encodeURIComponent("That promo code is invalid, inactive, or expired.")}`);
   const quote=priceCourses([course],promo??undefined), priced=quote.items[0];
-  const clientAmount=Number(form.get("amount"));
-  const charge=Number.isFinite(clientAmount)&&form.get("amount")!==null?clientAmount:priced.amount;
+  const charge=priced.amount;
   if(promo&&!priced.eligible)redirect(`/checkout/${courseId}?error=${encodeURIComponent("That promo code does not apply to this instructor’s courses.")}`);
   if(String(form.get("paymentMethod")??"CARD")==="WALLET"){
     const key=String(form.get("idempotencyKey")??"");
     if(!isIdempotencyKey(key))redirect(`/checkout/${courseId}?error=${encodeURIComponent("Please reload checkout and try again.")}`);
     const prior=await db.walletTransaction.findUnique({where:{idempotencyKey:key}});
     if(prior){if(prior.userId===user.id&&prior.type==="COURSE_PAYMENT"&&prior.status==="COMPLETED")redirect(`/student/courses/${courseId}/learn`);redirect(`/checkout/${courseId}?error=${encodeURIComponent("This wallet payment attempt was already processed. Reload checkout to retry.")}`);}
-    if(promo&&priced.discountAmount>0){
-      const stillAvailable=await isPromoAvailable(promo.id);
-      if(!stillAvailable) redirect(`/checkout/${courseId}?error=${encodeURIComponent("That promo code has already been used.")}`);
-    }
-    const result={value:"success" as "success"|"insufficient"};
+    const result={value:"success" as "success"|"insufficient"|"promoUnavailable"};
     let orderId="";
     try{
       orderId=await db.$transaction(async tx=>{
@@ -194,6 +189,10 @@ export async function purchaseCourse(form: FormData) {
         const costCents=charge*100;
         const debit=await tx.wallet.updateMany({where:{id:wallet.id,balanceCents:{gte:costCents}},data:{balanceCents:{decrement:costCents}}});
         if(!debit.count){result.value="insufficient";return "";}
+        if(promo&&priced.discountAmount>0&&!(await claimPromo(tx,promo.id))){
+          result.value="promoUnavailable";
+          throw new Error("PROMO_UNAVAILABLE");
+        }
         const balanceAfter=(await tx.wallet.findUniqueOrThrow({where:{id:wallet.id},select:{balanceCents:true}})).balanceCents;
         const walletTx=await tx.walletTransaction.create({data:{walletId:wallet.id,userId:user.id,type:"COURSE_PAYMENT",amountCents:costCents,balanceBeforeCents:balanceAfter+costCents,balanceAfterCents:balanceAfter,description:`Wallet payment for ${course.title}`,status:"COMPLETED",idempotencyKey:key}});
         const paymentId=generateTransactionId();
@@ -203,12 +202,16 @@ export async function purchaseCourse(form: FormData) {
         return created.id;
       });
     }catch(error){
+      if(error instanceof Error&&error.message==="PROMO_UNAVAILABLE"){
+        result.value="promoUnavailable";
+      }else{
       const duplicate=await db.walletTransaction.findUnique({where:{idempotencyKey:key}});
       if(duplicate?.userId===user.id&&duplicate.type==="COURSE_PAYMENT"&&duplicate.status==="COMPLETED")redirect(`/student/courses/${courseId}/learn`);
       throw error;
+      }
     }
     if(result.value==="insufficient")redirect(`/checkout/${courseId}?error=${encodeURIComponent("Insufficient wallet funds. Top up your wallet, then reload checkout.")}`);
-    if(promo&&priced.discountAmount>0)await consumePromo(promo.id);
+    if(result.value==="promoUnavailable")redirect(`/checkout/${courseId}?error=${encodeURIComponent("That promo code has already been used.")}`);
     revalidatePath("/student");revalidatePath("/student/courses");revalidatePath("/student/orders");revalidatePath("/student/wallet");revalidatePath("/student/profile");
     redirect(`/student/orders/${orderId}?success=1`);
   }
@@ -219,17 +222,15 @@ export async function purchaseCourse(form: FormData) {
     revalidatePath("/student/orders");revalidatePath("/instructor/sales");
     redirect(`/checkout/${courseId}?error=${encodeURIComponent("Payment could not be completed. The failed demo attempt was added to your order history.")}`);
   }
-  if(promo&&priced.discountAmount>0){
-    const stillAvailable=await isPromoAvailable(promo.id);
-    if(!stillAvailable) redirect(`/checkout/${courseId}?error=${encodeURIComponent("That promo code has already been used.")}`);
-  }
+  let promoUnavailable=false;
   const order=await db.$transaction(async tx=>{
+    if(promo&&priced.discountAmount>0&&!(await claimPromo(tx,promo.id))){promoUnavailable=true;return null;}
     const created=await tx.order.create({data:{userId:user.id,courseId,amount:charge,discountAmount:priced.discountAmount,promoCodeId:priced.discountAmount?promo?.id:null,status:"COMPLETED",payment:{create:{transactionId:payment.transactionId,status:"COMPLETED"}},}});
     await tx.enrollment.create({data:{userId:user.id,courseId}});
     await tx.notification.create({data:{userId:user.id,title:"You’re enrolled",body:`Your purchase of ${course.title} was successful.`}});
     return created;
   });
-  if(promo&&priced.discountAmount>0)await consumePromo(promo.id);
+  if(promoUnavailable||!order)redirect(`/checkout/${courseId}?error=${encodeURIComponent("That promo code has already been used.")}`);
   revalidatePath("/student"); revalidatePath("/student/courses"); revalidatePath("/student/orders");
   redirect(`/student/orders/${order.id}?success=1`);
 }
@@ -254,31 +255,25 @@ export async function purchaseCart(form: FormData) {
   if(promoCode&&!promo)redirect(`/checkout?courseIds=${encodeURIComponent(ids.join(","))}&error=${encodeURIComponent("That promo code is invalid, inactive, or expired.")}`);
   const quote=priceCourses(toPurchase,promo??undefined);
   if(promo&&!quote.items.some((item)=>item.eligible))redirect(`/checkout?courseIds=${encodeURIComponent(ids.join(","))}&error=${encodeURIComponent("That promo code does not apply to any course in this order.")}`);
-  const clientTotal=Number(form.get("amount"));
-  const useClientAmount=Number.isFinite(clientTotal)&&form.get("amount")!==null;
   const serverAmounts=quote.items.map((item)=>item.amount);
-  const amounts=useClientAmount
-    ? (serverAmounts.length>0
-        ? serverAmounts.map((amt,idx)=>idx===0?clientTotal-serverAmounts.slice(1).reduce((s,a)=>s+a,0):amt)
-        : serverAmounts)
-    : serverAmounts;
-  const total=useClientAmount?clientTotal:quote.total;
+  const amounts=serverAmounts;
+  const total=quote.total;
   if(String(form.get("paymentMethod")??"CARD")==="WALLET"){
     const key=String(form.get("idempotencyKey")??"");
     if(!isIdempotencyKey(key))redirect(`/checkout?courseIds=${encodeURIComponent(ids.join(","))}&error=${encodeURIComponent("Please reload checkout and try again.")}`);
     const prior=await db.walletTransaction.findUnique({where:{idempotencyKey:key}});
     if(prior){if(prior.userId===user.id&&prior.type==="COURSE_PAYMENT"&&prior.status==="COMPLETED")redirect(`/checkout?success=1&purchased=${encodeURIComponent(toPurchase.map(c=>c.id).join(","))}`);redirect(`/checkout?courseIds=${encodeURIComponent(ids.join(","))}&error=${encodeURIComponent("This wallet payment attempt was already processed. Reload checkout to retry.")}`);}
-    if(promo&&quote.discountAmount>0){
-      const stillAvailable=await isPromoAvailable(promo.id);
-      if(!stillAvailable) redirect(`/checkout?courseIds=${encodeURIComponent(ids.join(","))}&error=${encodeURIComponent("That promo code has already been used.")}`);
-    }
-    const result={value:"success" as "success"|"insufficient"};
+    const result={value:"success" as "success"|"insufficient"|"promoUnavailable"};
     try{
       await db.$transaction(async tx=>{
         const wallet=await tx.wallet.upsert({where:{userId:user.id},create:{userId:user.id},update:{}});
         const costCents=total*100;
         const debit=await tx.wallet.updateMany({where:{id:wallet.id,balanceCents:{gte:costCents}},data:{balanceCents:{decrement:costCents}}});
         if(!debit.count){result.value="insufficient";return;}
+        if(promo&&quote.discountAmount>0&&!(await claimPromo(tx,promo.id))){
+          result.value="promoUnavailable";
+          throw new Error("PROMO_UNAVAILABLE");
+        }
         const balanceAfter=(await tx.wallet.findUniqueOrThrow({where:{id:wallet.id},select:{balanceCents:true}})).balanceCents;
         const walletTx=await tx.walletTransaction.create({data:{walletId:wallet.id,userId:user.id,type:"COURSE_PAYMENT",amountCents:costCents,balanceBeforeCents:balanceAfter+costCents,balanceAfterCents:balanceAfter,description:`Wallet payment for ${toPurchase.length} course${toPurchase.length===1?"":"s"}`,status:"COMPLETED",idempotencyKey:key}});
         const baseTransactionId=generateTransactionId();
@@ -289,12 +284,16 @@ export async function purchaseCart(form: FormData) {
         }
       });
     }catch(error){
+      if(error instanceof Error&&error.message==="PROMO_UNAVAILABLE"){
+        result.value="promoUnavailable";
+      }else{
       const duplicate=await db.walletTransaction.findUnique({where:{idempotencyKey:key}});
       if(duplicate?.userId===user.id&&duplicate.type==="COURSE_PAYMENT"&&duplicate.status==="COMPLETED")redirect(`/checkout?success=1&purchased=${encodeURIComponent(toPurchase.map(c=>c.id).join(","))}`);
       throw error;
+      }
     }
     if(result.value==="insufficient")redirect(`/checkout?courseIds=${encodeURIComponent(ids.join(","))}&error=${encodeURIComponent("Insufficient wallet funds. Top up your wallet, then reload checkout.")}`);
-    if(promo&&quote.discountAmount>0)await consumePromo(promo.id);
+    if(result.value==="promoUnavailable")redirect(`/checkout?courseIds=${encodeURIComponent(ids.join(","))}&error=${encodeURIComponent("That promo code has already been used.")}`);
     revalidatePath("/student");revalidatePath("/student/courses");revalidatePath("/student/orders");revalidatePath("/student/wallet");revalidatePath("/student/profile");
     redirect(`/checkout?success=1&purchased=${encodeURIComponent(toPurchase.map(c=>c.id).join(","))}`);
   }
@@ -329,11 +328,9 @@ export async function purchaseCart(form: FormData) {
     redirect(`/checkout?courseIds=${encodeURIComponent(ids.join(","))}&error=${encodeURIComponent("Payment could not be completed. No courses were added to your learning space.")}`);
   }
 
-  if(promo&&quote.discountAmount>0){
-    const stillAvailable=await isPromoAvailable(promo.id);
-    if(!stillAvailable) redirect(`/checkout?courseIds=${encodeURIComponent(ids.join(","))}&error=${encodeURIComponent("That promo code has already been used.")}`);
-  }
-  await db.$transaction(async (tx) => {
+  let promoUnavailable=false;
+  const completed=await db.$transaction(async (tx) => {
+    if(promo&&quote.discountAmount>0&&!(await claimPromo(tx,promo.id))){promoUnavailable=true;return false;}
     for (const [index, course] of toPurchase.entries()) {
       await tx.order.create({
         data: {
@@ -351,8 +348,9 @@ export async function purchaseCart(form: FormData) {
         data: { userId: user.id, title: "You’re enrolled", body: `Your purchase of ${course.title} was successful.` },
       });
     }
+    return true;
   });
-  if(promo&&quote.discountAmount>0)await consumePromo(promo.id);
+  if(promoUnavailable||!completed)redirect(`/checkout?courseIds=${encodeURIComponent(ids.join(","))}&error=${encodeURIComponent("That promo code has already been used.")}`);
 
   revalidatePath("/student");
   revalidatePath("/student/courses");

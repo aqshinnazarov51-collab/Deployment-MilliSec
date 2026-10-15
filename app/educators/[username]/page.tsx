@@ -26,6 +26,7 @@ export default async function EducatorPage({ params }: { params: Promise<{ usern
   const reviewCount = educator.courses.reduce((sum, course) => sum + course._count.reviews, 0);
   const learners = educator.courses.reduce((sum, course) => sum + course._count.enrollments, 0);
   const topics = [...new Set(educator.courses.map((course) => course.category.name))];
+  const website = safeWebsite(educator.profile?.website);
 
   return <main className="educator-profile-page">
     <section className="educator-profile-hero"><div className="shell educator-profile-hero-inner">
@@ -33,11 +34,21 @@ export default async function EducatorPage({ params }: { params: Promise<{ usern
       <div className="educator-profile-heading">
           <ProfileAvatar className="educator-profile-avatar" src={educator.profile?.avatarUrl ? getAvatarSrc(educator.profile.avatarUrl) : null} name={`${educator.firstName} ${educator.lastName}`} />
         <div className="educator-profile-intro"><div className="eyebrow">Lumio instructor</div><h1>{educator.firstName} {educator.lastName}</h1><p>{educator.profile?.bio || "Sharing practical ideas and helping learners build skills one lesson at a time."}</p>
-          {educator.profile?.website && <a className="educator-website" href={educator.profile.website} target="_blank" rel="noreferrer"><Globe2 size={14} /> Personal website</a>}
+          {website && <a className="educator-website" href={website} target="_blank" rel="noopener noreferrer"><Globe2 size={14} /> Personal website</a>}
         </div>
       </div>
       <div className="educator-profile-stats"><span><BookOpenCheck size={16} /><strong>{educator.courses.length}</strong> courses</span><span><Users size={16} /><strong>{learners.toLocaleString()}</strong> enrollments</span><span><Star size={16} fill="currentColor" /><strong>{average ? average.toFixed(1) : "New"}</strong> average rating <small>({reviewCount.toLocaleString()} reviews)</small></span><span><GraduationCap size={16} />{topics.slice(0, 3).join(" · ")}</span></div>
     </div></section>
     <section className="shell educator-courses-section"><div className="section-heading"><div><div className="eyebrow">Learn with {educator.firstName}</div><h2>Courses by this instructor</h2><p>Practical classes, made to help you put new skills to work.</p></div></div><div className="course-grid">{educator.courses.map((course) => <CourseCard key={course.id} course={course} />)}</div></section>
   </main>;
+}
+
+function safeWebsite(value: string | null | undefined) {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : null;
+  } catch {
+    return null;
+  }
 }

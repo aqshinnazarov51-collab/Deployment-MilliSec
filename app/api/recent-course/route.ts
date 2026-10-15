@@ -6,13 +6,19 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const courseId = String(body.courseId ?? "");
   const courseTitle = String(body.courseTitle ?? "");
-  if (!courseId || !courseTitle) {
+  if (!courseId || courseId.length > 100 || !courseTitle || courseTitle.length > 200) {
     return NextResponse.json({ error: "courseId and courseTitle required" }, { status: 400 });
   }
   const payload = serialize({ courseId, courseTitle, viewedAt: Date.now() });
   const encoded = Buffer.from(payload, "utf-8").toString("base64");
   const res = NextResponse.json({ ok: true });
-  res.cookies.set("lumio_recent", encoded, { httpOnly: false, path: "/" });
+  res.cookies.set("lumio_recent", encoded, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 30,
+  });
   return res;
 }
 

@@ -297,3 +297,13 @@ model AnalyticsEvent {
   path      String
   createdAt DateTime @default(now())
 }
+
+model RateLimitBucket {
+  key             String   @id
+  count           Int      @default(0)
+  windowStartedAt DateTime
+  blockedUntil    DateTime?
+  updatedAt       DateTime @updatedAt
+
+  @@index([updatedAt])
+}

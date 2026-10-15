@@ -1,7 +1,7 @@
 import { z } from "zod";
 export const emailSchema = z.string().trim().email("Enter a valid email address").max(254).transform(v => v.toLowerCase());
-export const passwordSchema = z.string().min(3, "Minimum 3 characters").max(72);
-export const registerSchema = z.object({ firstName:z.string().trim().min(1).max(50), lastName:z.string().trim().min(1).max(50), username:z.string().trim().min(3).max(30).regex(/^[a-zA-Z0-9_.-]+$/), email:emailSchema, password:passwordSchema, confirmPassword:z.string(), role:z.enum(["STUDENT","INSTRUCTOR"]) }).refine(v => v.password === v.confirmPassword, { path:["confirmPassword"], message:"Passwords do not match" });
+export const passwordSchema = z.string().min(12, "Use at least 12 characters").max(72);
+export const registerSchema = z.object({ firstName:z.string().trim().min(1).max(50), lastName:z.string().trim().min(1).max(50), username:z.string().trim().min(3).max(30).regex(/^[a-zA-Z0-9_.-]+$/), email:emailSchema, password:passwordSchema, confirmPassword:z.string() }).refine(v => v.password === v.confirmPassword, { path:["confirmPassword"], message:"Passwords do not match" });
 const courseThumbnailSchema = z.string().trim().max(400).refine((value) => {
   if (/^.{1,12}\|#[0-9a-f]{6}$/i.test(value)) return true;
   try {

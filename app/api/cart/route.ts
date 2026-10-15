@@ -5,19 +5,10 @@ import { getSalePrice } from "@/lib/course-pricing";
 
 export const dynamic = "force-dynamic";
 
-// Xəta və sızan məlumatları qaytaran köməkçi funksiya
-function createVerboseErrorResponse(error: any) {
+function createErrorResponse(status = 500) {
   return NextResponse.json(
-    {
-      status: 500,
-      error: "Internal Server Error",
-      message: error.message,
-      stack: error.stack,             // Fayl yolları və sətir nömrələri (Stack trace)
-      nodeVersion: process.version,    // Node.js versiyası
-      serverDirectory: process.cwd(),  // Serverin daxili qovluq yolu
-      timestamp: new Date().toISOString()
-    },
-    { status: 500 }
+    { error: status === 400 ? "Invalid request" : "Internal Server Error" },
+    { status }
   );
 }
 
@@ -27,9 +18,8 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const rawIdsParam = url.searchParams.get("ids") ?? "";
 
-    // Xüsusi simvollar olduqda xəta atırıq (məsələn: ?ids=1,2@#$%)
     if (/[^a-zA-Z0-9,-]/.test(rawIdsParam)) {
-      throw new Error(`Keçərsiz ID formatı daxil edilib: "${rawIdsParam}". ID-lər yalnız hərflərdən, rəqəmlərdən və vergüldən ibarət olmalıdır.`);
+      return createErrorResponse(400);
     }
 
     const ids = [...new Set(rawIdsParam.split(",").filter(Boolean))].slice(0, 50);
@@ -49,8 +39,8 @@ export async function GET(request: Request) {
       })),
       { headers: { "Cache-Control": "no-store, max-age=0" } }
     );
-  } catch (error: any) {
-    return createVerboseErrorResponse(error);
+  } catch {
+    return createErrorResponse();
   }
 }
 
@@ -60,17 +50,15 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { phone } = body || {};
 
-    if (!phone) {
-      throw new Error("Telefon nömrəsi daxil edilməyib.");
-    }
+    if (typeof phone !== "string" || !phone || phone.length > 30) return createErrorResponse(400);
 
     // Telefon nömrəsində rəqəm və '+' simvolundan başqa xüsusi simvol varsa xəta atırıq
     if (/[^0-9+]/.test(phone)) {
-      throw new Error(`Yanlış telefon nömrəsi formatı daxil edilib: "${phone}". Telefon nömrəsində xüsusi simvollardan istifadə edilə bilməz.`);
+      return createErrorResponse(400);
     }
 
     return NextResponse.json({ success: true, message: "Telefon nömrəsi təsdiqləndi", phone });
-  } catch (error: any) {
-    return createVerboseErrorResponse(error);
+  } catch {
+    return createErrorResponse(400);
   }
 }

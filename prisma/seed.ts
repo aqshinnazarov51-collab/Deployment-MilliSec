@@ -7,11 +7,11 @@ import { refreshCatalog } from "./refresh-catalog";
 const db = new PrismaClient();
 
 const people = [
-  { email: "student@example.com", username: "learner", firstName: "Alex", lastName: "Morgan", role: "STUDENT", password: "Student123!" },
-  { email: "instructor@example.com", username: "jordanlee", firstName: "Jordan", lastName: "Lee", role: "INSTRUCTOR", password: "Instructor123!" },
-  { email: "admin@example.com", username: "lumioadmin", firstName: "Taylor", lastName: "Admin", role: "ADMIN", password: "Admin123!" },
-  { email: "maya@example.com", username: "mayapatel", firstName: "Maya", lastName: "Patel", role: "INSTRUCTOR", password: "Instructor123!" },
-  { email: "sam@example.com", username: "samrivera", firstName: "Sam", lastName: "Rivera", role: "INSTRUCTOR", password: "Instructor123!" },
+  { email: "student@example.com", username: "learner", firstName: "Alex", lastName: "Morgan", role: "STUDENT", password: process.env.SEED_STUDENT_PASSWORD ?? "" },
+  { email: "instructor@example.com", username: "jordanlee", firstName: "Jordan", lastName: "Lee", role: "INSTRUCTOR", password: process.env.SEED_INSTRUCTOR_PASSWORD ?? "" },
+  { email: "admin@example.com", username: "lumioadmin", firstName: "Taylor", lastName: "Admin", role: "ADMIN", password: process.env.SEED_ADMIN_PASSWORD ?? "" },
+  { email: "maya@example.com", username: "mayapatel", firstName: "Maya", lastName: "Patel", role: "INSTRUCTOR", password: process.env.SEED_INSTRUCTOR_PASSWORD ?? "" },
+  { email: "sam@example.com", username: "samrivera", firstName: "Sam", lastName: "Rivera", role: "INSTRUCTOR", password: process.env.SEED_INSTRUCTOR_PASSWORD ?? "" },
 ];
 
 type CourseSeed = {
@@ -53,6 +53,26 @@ const categories = [
 ] as const;
 
 async function main() {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Demo seeding is disabled in production.");
+  }
+  if (process.env.ALLOW_DEMO_SEED !== "true") {
+    throw new Error("Set ALLOW_DEMO_SEED=true to explicitly enable this destructive local demo seed.");
+  }
+  const seedPasswords = [
+    ["SEED_STUDENT_PASSWORD", process.env.SEED_STUDENT_PASSWORD ?? ""],
+    ["SEED_INSTRUCTOR_PASSWORD", process.env.SEED_INSTRUCTOR_PASSWORD ?? ""],
+    ["SEED_ADMIN_PASSWORD", process.env.SEED_ADMIN_PASSWORD ?? ""],
+  ] as const;
+  for (const [name, password] of seedPasswords) {
+    if (password.length < 12) {
+      throw new Error(`Set ${name} to a unique strong value of at least 12 characters before seeding.`);
+    }
+  }
+  if (new Set(seedPasswords.map(([, password]) => password)).size !== seedPasswords.length) {
+    throw new Error("Use a different password for each demo role.");
+  }
+
   // Clear dependent records first so the seed can safely be run more than once.
   await db.notification.deleteMany();
   await db.session.deleteMany();

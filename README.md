@@ -33,13 +33,7 @@ Start the site:
 npm run dev
 ```
 
-Before the first development start, Lumio automatically generates the Prisma client and applies database migrations. When Prisma creates a new database, its configured seed script adds the starter courses and demo accounts. Later starts apply pending migrations and keep the local data. The SQLite database file is intentionally excluded from Git; each collaborator gets a separate local database. `npm run db:seed` resets the demo data, so do not run it if you need to keep that database's data.
-
-Start the development server:
-
-```bash
-npm run dev
-```
+Before the first development start, Lumio automatically generates the Prisma client and applies database migrations. The SQLite database file is intentionally excluded from Git; each collaborator gets a separate local database. To populate a local database, configure `ALLOW_DEMO_SEED=true` and the three seed passwords described below, then run `npm run db:seed`. Seeding deletes and recreates demo data, so do not run it if you need to keep that database's data.
 
 Open [http://localhost:3000](http://localhost:3000).
 
@@ -55,13 +49,9 @@ npm start
 
 ## Demo accounts
 
-| Role | Email | Password |
-| --- | --- | --- |
-| Student | `student@example.com` | `Student123!` |
-| Instructor | `instructor@example.com` | `Instructor123!` |
-| Admin | `admin@example.com` | `Admin123!` |
+The seed creates local-only student, instructor, and administrator accounts. Before running it, configure `ALLOW_DEMO_SEED=true` and set unique `SEED_STUDENT_PASSWORD`, `SEED_INSTRUCTOR_PASSWORD`, and `SEED_ADMIN_PASSWORD` values of at least 12 characters in your local environment. Seeding is blocked in production and resets demo records. Never reuse production credentials for demo accounts.
 
-The seed creates 10 published courses, nine categories, three instructors, lessons, reviews, a student enrollment, a completed demo order, and notifications. Seed accounts are for local development only. Re-running the seed resets the demo records.
+The seed creates 10 published courses, nine categories, three instructors, lessons, reviews, a student enrollment, a completed demo order, and notifications.
 
 ## Demo checkout
 
@@ -73,15 +63,17 @@ Checkout is a local simulation. No real payment provider is connected. Card valu
 
 Every checkout page states “Test payment only — no real charge”. The database records the mock order, payment status, transaction ID, and enrollment, but no card data.
 
-## Promo codes and training lab
+## Promo codes
 
 Instructors can create and manage course-specific promo codes at `/instructor/promos`. Codes are checked for activity and expiration, and the server recalculates discounts from database prices during checkout. A promo created by an instructor only discounts that instructor's courses; cart discounts are applied per eligible course.
 
-The isolated Business Logic Misconfiguration lab is available at `/training/business-logic-misconfiguration` only when `ENABLE_TRAINING_VULNERABILITIES="true"` is set in a non-production environment. It deliberately trusts a browser-supplied discount and writes only to the demo database; it does not contact a payment provider. Production always returns 404 from training routes, even if the flag is set. The legacy race-condition training endpoint at `/api/promo/apply` is gated the same way.
+New public registrations receive the student role. Instructor access must be granted through a trusted administrative process.
 
 ## Database and migrations
 
 The Prisma schema lives in `prisma/schema.prisma`; the initial SQLite migration is in `prisma/migrations`. The schema keeps role, course level, and order status as validated strings so it can be migrated to PostgreSQL without depending on SQLite enum support.
+
+Apply pending migrations to a production database with `npx prisma migrate deploy` before starting the updated application. This includes the persistent login-rate-limit table introduced in the security fixes. Login throttling hashes client addresses from the trusted reverse-proxy headers; configure the proxy to overwrite or append the real client IP in `X-Forwarded-For` and keep the app instance inaccessible directly from the public internet.
 
 To create a migration after changing the schema:
 

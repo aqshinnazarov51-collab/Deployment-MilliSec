@@ -1,19 +1,13 @@
 import { updateProfile } from "@/actions/account";
 import { requireUser } from "@/lib/auth";
-import { db } from "@/lib/db";
 import { Alert } from "@/components/Message";
 import { AvatarUpload } from "@/components/AvatarUpload";
 import { WalletSummary } from "@/components/WalletSummary";
 
-export default async function Profile({ searchParams }: { searchParams: Promise<{ error?: string; saved?: string; user_id?: string }> }) {
+export default async function Profile({ searchParams }: { searchParams: Promise<{ error?: string; saved?: string }> }) {
   const sessionUser = await requireUser("STUDENT");
   const p = await searchParams;
-
-  // VULNERABLE: no ownership/role check — any authenticated user can view
-  // any other user's profile by changing user_id in the URL (IDOR).
-  const user = p.user_id
-    ? (await db.user.findUnique({ where: { id: p.user_id }, include: { profile: true } })) ?? sessionUser
-    : sessionUser;
+  const user = sessionUser;
 
   return (
     <>

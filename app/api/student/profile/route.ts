@@ -12,21 +12,8 @@ function profilePathFor(role: string) {
   return role === "INSTRUCTOR" ? "/instructor/profile" : "/student/profile";
 }
 
-// VULN: Security Misconfiguration — verbose error response leaks stack trace,
-// file paths and Node version to the client on invalid input.
-function createVerboseErrorResponse(error: any) {
-  return NextResponse.json(
-    {
-      status: 500,
-      error: "Internal Server Error",
-      message: error.message,
-      stack: error.stack,
-      nodeVersion: process.version,
-      serverDirectory: process.cwd(),
-      timestamp: new Date().toISOString(),
-    },
-    { status: 500 }
-  );
+function createErrorResponse() {
+  return NextResponse.json({ error: "The profile could not be updated." }, { status: 500 });
 }
 
 function redirectToProfile(path: string) {
@@ -52,18 +39,28 @@ async function applyUpdate(userId: string, role: string, data: Record<string, st
   }
 
   const rawPhone = val(data.phone);
-  if (rawPhone && /[^0-9+\-\s()]/.test(rawPhone)) {
-    throw new Error(`Invalid phone number format: "${rawPhone}". The phone number contains disallowed characters.`);
+  const bio = val(data.bio);
+  const city = val(data.city);
+  const country = val(data.country);
+  const website = val(data.website);
+  const socialLinks = val(data.socialLinks);
+  const tooLong = (value: string | null, limit: number) => Boolean(value && value.length > limit);
+  let validWebsite = true;
+  if (website) {
+    try {
+      const parsedWebsite = new URL(website);
+      validWebsite = parsedWebsite.protocol === "http:" || parsedWebsite.protocol === "https:";
+    } catch {
+      validWebsite = false;
+    }
+  }
+  if ((rawPhone && /[^0-9+\-\s()]/.test(rawPhone)) || !validWebsite ||
+      tooLong(rawPhone, 30) || tooLong(bio, 1000) || tooLong(city, 100) ||
+      tooLong(country, 100) || tooLong(website, 200) || tooLong(socialLinks, 1000)) {
+    return redirectToProfile(`${profilePath}?error=Check+the+profile+fields`);
   }
 
-  const profileData = {
-    phone: val(data.phone),
-    bio: val(data.bio),
-    city: val(data.city),
-    country: val(data.country),
-    website: val(data.website),
-    socialLinks: val(data.socialLinks),
-  };
+  const profileData = { phone: rawPhone, bio, city, country, website, socialLinks };
 
   try {
     await db.user.update({
@@ -83,44 +80,44 @@ async function applyUpdate(userId: string, role: string, data: Record<string, st
   return redirectToProfile(`${profilePath}?saved=1`);
 }
 
-// VULN: CSRF — mirrors actions/account.ts updateProfile, but as a
-// plain route handler (POST + GET). No anti-CSRF token, no origin check.
 export async function POST(req: NextRequest) {
+  const origin = req.headers.get("origin");
+  const host = req.headers.get("host");
+  let originHost = "";
+  try {
+    originHost = origin ? new URL(origin).host : "";
+  } catch {
+    return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+  }
+  if (!host || !originHost || originHost !== host) {
+    return NextResponse.json({ error: "Cross-origin request rejected." }, { status: 403 });
+  }
+
   const user = await requireUser();
   const form = await req.formData();
+  const formString = (name: string) => {
+    const value = form.get(name);
+    return typeof value === "string" ? value : null;
+  };
   const data = {
-    firstName: form.get("firstName") as string | null,
-    lastName: form.get("lastName") as string | null,
-    username: form.get("username") as string | null,
-    email: form.get("email") as string | null,
-    phone: form.get("phone") as string | null,
-    bio: form.get("bio") as string | null,
-    city: form.get("city") as string | null,
-    country: form.get("country") as string | null,
-    website: form.get("website") as string | null,
-    socialLinks: form.get("socialLinks") as string | null,
+    firstName: formString("firstName"),
+    lastName: formString("lastName"),
+    username: formString("username"),
+    email: formString("email"),
+    phone: formString("phone"),
+    bio: formString("bio"),
+    city: formString("city"),
+    country: formString("country"),
+    website: formString("website"),
+    socialLinks: formString("socialLinks"),
   };
   try {
     return await applyUpdate(user.id, user.role, data);
-  } catch (error: any) {
-    return createVerboseErrorResponse(error);
+  } catch {
+    return createErrorResponse();
   }
 }
 
-export async function GET(req: NextRequest) {
-  const user = await requireUser();
-  const sp = req.nextUrl.searchParams;
-  const data = {
-    firstName: sp.get("firstName"),
-    lastName: sp.get("lastName"),
-    username: sp.get("username"),
-    email: sp.get("email"),
-    phone: sp.get("phone"),
-    bio: sp.get("bio"),
-    city: sp.get("city"),
-    country: sp.get("country"),
-    website: sp.get("website"),
-    socialLinks: sp.get("socialLinks"),
-  };
-  return applyUpdate(user.id, user.role, data);
+export async function GET() {
+  return NextResponse.json({ error: "Method not allowed" }, { status: 405, headers: { Allow: "POST" } });
 }

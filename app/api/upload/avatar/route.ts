@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { getUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getAvatarFilename, getAvatarUploadDir, getAvatarUrl } from "@/lib/avatar-storage";
+import { hasSameOrigin } from "@/lib/request-security";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,6 +41,7 @@ async function removeStoredAvatar(url: string | null | undefined) {
 }
 
 export async function POST(request: Request) {
+  if (!hasSameOrigin(request)) return errorResponse("Cross-origin request rejected.", 403);
   let user: Awaited<ReturnType<typeof getUser>>;
   try {
     user = await getUser();
@@ -102,7 +104,8 @@ export async function POST(request: Request) {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
+  if (!hasSameOrigin(request)) return errorResponse("Cross-origin request rejected.", 403);
   let user: Awaited<ReturnType<typeof getUser>>;
   try {
     user = await getUser();

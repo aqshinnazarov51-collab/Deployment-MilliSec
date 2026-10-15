@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { createSession, requireUser } from "@/lib/auth";
 import { emailSchema, passwordSchema } from "@/lib/validation";
 
 export async function updateProfile(form:FormData){
@@ -32,9 +32,15 @@ export async function changePassword(form:FormData){
   const user=await requireUser(),current=String(form.get("currentPassword")??""),next=String(form.get("newPassword")??""),confirm=String(form.get("confirmPassword")??"");
   const path=user.role==="INSTRUCTOR"?"/instructor/settings":"/student/settings";
   const parsed=passwordSchema.safeParse(next);
-  if(!await bcrypt.compare(current,user.passwordHash)) redirect(`${path}?error=Current+password+is+incorrect`);
+  const credential=await db.user.findUnique({where:{id:user.id},select:{passwordHash:true}});
+  if(!credential||!await bcrypt.compare(current,credential.passwordHash)) redirect(`${path}?error=Current+password+is+incorrect`);
   if(!parsed.success||next!==confirm) redirect(`${path}?error=${encodeURIComponent(parsed.success?"Passwords do not match":parsed.error.issues[0].message)}`);
-  await db.user.update({where:{id:user.id},data:{passwordHash:await bcrypt.hash(next,12)}});redirect(`${path}?saved=Password+updated`);
+  await db.$transaction(async tx=>{
+    await tx.user.update({where:{id:user.id},data:{passwordHash:await bcrypt.hash(next,12)}});
+    await tx.session.deleteMany({where:{userId:user.id}});
+  });
+  await createSession(user.id);
+  redirect(`${path}?saved=Password+updated`);
 }
 function val(f:FormData,k:string){const v=String(f.get(k)??"").trim();return v||null;}
 function prefs(f:FormData){return {emailNotifications:f.get("emailNotifications")==="on",courseUpdates:f.get("courseUpdates")==="on",promotions:f.get("promotions")==="on",securityAlerts:f.get("securityAlerts")==="on"};}

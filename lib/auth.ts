@@ -4,9 +4,9 @@ import { createHmac, randomBytes } from "node:crypto";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 
-const COOKIE = "lumio_session";
+const COOKIE = process.env.NODE_ENV === "production" ? "__Host-lumio_session" : "lumio_session";
 function hash(token: string) { const secret=process.env.AUTH_SECRET;if(!secret||secret.length<32)throw new Error("AUTH_SECRET must contain at least 32 characters");return createHmac("sha256",secret).update(token).digest("hex"); }
-export async function createSession(userId: string, remember = true) {
+export async function createSession(userId: string, remember = false) {
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + (remember ? 30 : 1) * 86400000);
   await db.session.create({ data: { userId, tokenHash: hash(token), expiresAt } });
@@ -16,7 +16,24 @@ export async function createSession(userId: string, remember = true) {
 export async function getUser() {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
-  const session = await db.session.findUnique({ where:{ tokenHash:hash(token) }, include:{ user:{ include:{ profile:true, settings:true } } } });
+  const session = await db.session.findUnique({
+    where: { tokenHash: hash(token) },
+    include: {
+      user: {
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          blocked: true,
+          profile: true,
+          settings: true,
+        },
+      },
+    },
+  });
   if (!session || session.expiresAt < new Date() || session.user.blocked) return null;
   return session.user;
 }

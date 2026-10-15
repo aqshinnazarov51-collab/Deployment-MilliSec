@@ -20,11 +20,11 @@ export default async function ResetPassword({ searchParams }: { searchParams: Se
             <input type="hidden" name="token" value={token} />
             <div className="field">
               <label htmlFor="new-password">New password</label>
-              <input id="new-password" required name="password" type="password" minLength={8} maxLength={72} autoComplete="new-password" />
+              <input id="new-password" required name="password" type="password" minLength={12} maxLength={72} autoComplete="new-password" />
             </div>
             <div className="field">
               <label htmlFor="confirm-password">Confirm new password</label>
-              <input id="confirm-password" required name="confirmPassword" type="password" minLength={8} maxLength={72} autoComplete="new-password" />
+              <input id="confirm-password" required name="confirmPassword" type="password" minLength={12} maxLength={72} autoComplete="new-password" />
             </div>
             <button className="button full">Update password</button>
           </form>

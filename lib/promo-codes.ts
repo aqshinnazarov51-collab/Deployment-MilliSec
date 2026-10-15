@@ -1,4 +1,5 @@
 import "server-only";
+import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { getSalePrice } from "@/lib/course-pricing";
 
@@ -23,21 +24,23 @@ export async function getValidPromo(code: string) {
   const normalized = code.trim().toUpperCase();
   if (!normalized || normalized.length > 40) return null;
   const promo = await db.promoCode.findUnique({ where: { code: normalized } });
-  if (!promo?.active || (promo.expiresAt && promo.expiresAt <= new Date())) return null;
+  if (!promo?.active || promo.used || !Number.isInteger(promo.discountPercent) ||
+      promo.discountPercent < 1 || promo.discountPercent > 100 ||
+      (promo.expiresAt && promo.expiresAt <= new Date())) return null;
   return promo;
 }
 
-export async function isPromoAvailable(promoId: string) {
-  const promo = await db.promoCode.findUnique({ where: { id: promoId }, select: { used: true } });
-  await new Promise((resolve) => setTimeout(resolve, 2000));
-  return !promo?.used;
-}
-
-export async function consumePromo(promoId: string) {
-  await db.promoCode.update({
-    where: { id: promoId },
+export async function claimPromo(tx: Prisma.TransactionClient, promoId: string) {
+  const result = await tx.promoCode.updateMany({
+    where: {
+      id: promoId,
+      active: true,
+      used: false,
+      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+    },
     data: { used: true, usedCount: { increment: 1 } },
   });
+  return result.count === 1;
 }
 
 export async function createSafeQuote(code: string, courseIds: string[]) {
