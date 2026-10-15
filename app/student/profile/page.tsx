@@ -11,9 +11,7 @@ export default async function Profile({ searchParams }: { searchParams: Promise<
 
   // VULNERABLE: no ownership/role check — any authenticated user can view
   // any other user's profile by changing user_id in the URL (IDOR).
-  const user = p.user_id
-    ? (await db.user.findUnique({ where: { id: p.user_id }, include: { profile: true } })) ?? sessionUser
-    : sessionUser;
+  const user = sessionUser;
 
   return (
     <>
