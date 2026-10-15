@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { getUser } from "@/lib/auth";
 import { emailSchema } from "@/lib/validation";
+import { withApiErrorBoundary } from "@/lib/api-error";
+import { hasSameOrigin } from "@/lib/request-security";
 
 function val(v: string | null) {
   const t = (v ?? "").trim();
@@ -10,10 +12,6 @@ function val(v: string | null) {
 
 function profilePathFor(role: string) {
   return role === "INSTRUCTOR" ? "/instructor/profile" : "/student/profile";
-}
-
-function createErrorResponse() {
-  return NextResponse.json({ error: "The profile could not be updated." }, { status: 500 });
 }
 
 function redirectToProfile(path: string) {
@@ -73,28 +71,30 @@ async function applyUpdate(userId: string, role: string, data: Record<string, st
         profile: { upsert: { create: profileData, update: profileData } },
       },
     });
-  } catch {
-    return redirectToProfile(`${profilePath}?error=Email+or+username+already+in+use`);
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
+      return redirectToProfile(`${profilePath}?error=Email+or+username+already+in+use`);
+    }
+    throw error;
   }
 
   return redirectToProfile(`${profilePath}?saved=1`);
 }
 
-export async function POST(req: NextRequest) {
-  const origin = req.headers.get("origin");
-  const host = req.headers.get("host");
-  let originHost = "";
-  try {
-    originHost = origin ? new URL(origin).host : "";
-  } catch {
-    return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
-  }
-  if (!host || !originHost || originHost !== host) {
+export const POST = withApiErrorBoundary("student profile POST", async (req: NextRequest) => {
+  if (!hasSameOrigin(req)) {
     return NextResponse.json({ error: "Cross-origin request rejected." }, { status: 403 });
   }
 
-  const user = await requireUser();
-  const form = await req.formData();
+  const user = await getUser();
+  if (!user) return redirectToProfile("/login");
+
+  let form: FormData;
+  try {
+    form = await req.formData();
+  } catch {
+    return NextResponse.json({ error: "Invalid request." }, { status: 400 });
+  }
   const formString = (name: string) => {
     const value = form.get(name);
     return typeof value === "string" ? value : null;
@@ -111,13 +111,9 @@ export async function POST(req: NextRequest) {
     website: formString("website"),
     socialLinks: formString("socialLinks"),
   };
-  try {
-    return await applyUpdate(user.id, user.role, data);
-  } catch {
-    return createErrorResponse();
-  }
-}
+  return applyUpdate(user.id, user.role, data);
+});
 
-export async function GET() {
-  return NextResponse.json({ error: "Method not allowed" }, { status: 405, headers: { Allow: "POST" } });
-}
+export const GET = withApiErrorBoundary("student profile GET", async () =>
+  NextResponse.json({ error: "Method not allowed" }, { status: 405, headers: { Allow: "POST" } }),
+);

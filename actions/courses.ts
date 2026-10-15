@@ -36,8 +36,8 @@ export async function saveCourse(form: FormData) {
   let categoryExists = false;
   try {
     categoryExists = Boolean(await db.category.findUnique({ where: { id: course.categoryId }, select: { id: true } }));
-  } catch (error) {
-    console.error("Course category could not be checked", { userId: user.id, error });
+  } catch {
+    console.error("Course category could not be checked");
     redirect(`${errorPath}?error=${encodeURIComponent("We couldn't verify the selected topic. Please try again.")}`);
   }
   if (!categoryExists) redirect(`${errorPath}?error=${encodeURIComponent("Choose a valid topic")}`);
@@ -46,8 +46,8 @@ export async function saveCourse(form: FormData) {
     let owned = false;
     try {
       owned = Boolean(await db.course.findFirst({ where: { id: courseId, instructorId: user.id }, select: { id: true } }));
-    } catch (error) {
-      console.error("Course ownership could not be checked", { userId: user.id, courseId, error });
+    } catch {
+      console.error("Course ownership could not be checked");
       redirect(`${errorPath}?error=${encodeURIComponent("We couldn't verify course access. Please try again.")}`);
     }
     if (!owned) redirect("/instructor?error=Course+not+found");
@@ -154,8 +154,8 @@ export async function saveCourse(form: FormData) {
       });
       destination = `/courses/${created.slug}`;
     }
-  } catch (error) {
-    console.error("Course could not be saved", { userId: user.id, courseId: courseId || null, error });
+  } catch {
+    console.error("Course could not be saved");
     redirect(`${errorPath}?error=${encodeURIComponent("We couldn't save the course. Please try again. If the problem continues, contact support.")}`);
   }
 

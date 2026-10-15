@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { emailSchema, passwordSchema, passwordUsesAccountInfo } from "@/lib/validation";
+import { sendPasswordResetEmail } from "@/lib/resend-email";
 
 const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
 
@@ -43,20 +44,11 @@ export async function requestPasswordResetAction(form: FormData) {
 
   if (apiKey && from) {
     try {
-      const response = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          from,
-          to: [user.email],
-          subject: "Reset your Lumio password",
-          html: `<p>We received a request to reset your Lumio password.</p><p><a href="${resetUrl}">Choose a new password</a></p><p>This link expires in 30 minutes. If you did not request this, you can ignore this email.</p>`,
-        }),
-      });
+      const response = await sendPasswordResetEmail({ apiKey, from, to: user.email, resetUrl });
       if (!response.ok) throw new Error(`Email service returned ${response.status}`);
       emailSent = true;
-    } catch (error) {
-      console.error("Password reset email could not be sent:", error instanceof Error ? error.message : "unknown error");
+    } catch {
+      console.error("Password reset email could not be sent");
       if (process.env.NODE_ENV === "production") {
         await db.passwordResetToken.deleteMany({ where: { userId: user.id } });
       }

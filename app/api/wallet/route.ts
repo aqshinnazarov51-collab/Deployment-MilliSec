@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { withApiErrorBoundary } from "@/lib/api-error";
 
-export async function GET() {
+export const GET = withApiErrorBoundary("wallet GET", async () => {
   const user = await getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const wallet = await db.wallet.findUnique({
@@ -13,4 +14,4 @@ export async function GET() {
     } } },
   });
   return NextResponse.json({ balanceCents: wallet?.balanceCents ?? 0, transactions: wallet?.transactions ?? [] }, { headers: { "Cache-Control": "private, no-store" } });
-}
+});

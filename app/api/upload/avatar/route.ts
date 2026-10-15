@@ -6,6 +6,7 @@ import { getUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getAvatarFilename, getAvatarUploadDir, getAvatarUrl } from "@/lib/avatar-storage";
 import { hasSameOrigin } from "@/lib/request-security";
+import { withApiErrorBoundary } from "@/lib/api-error";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,10 +28,6 @@ function validImage(bytes: Buffer, type: string) {
   return false;
 }
 
-function isStoragePermissionError(error: unknown) {
-  return Boolean(error && typeof error === "object" && "code" in error && ["EACCES", "EPERM", "EROFS"].includes(String(error.code)));
-}
-
 function errorResponse(error: string, status: number) {
   return NextResponse.json({ error }, { status, headers: { "Cache-Control": "no-store" } });
 }
@@ -40,15 +37,9 @@ async function removeStoredAvatar(url: string | null | undefined) {
   if (filename) await unlink(path.join(getAvatarUploadDir(), filename)).catch(() => {});
 }
 
-export async function POST(request: Request) {
+export const POST = withApiErrorBoundary("avatar upload POST", async (request: Request) => {
   if (!hasSameOrigin(request)) return errorResponse("Cross-origin request rejected.", 403);
-  let user: Awaited<ReturnType<typeof getUser>>;
-  try {
-    user = await getUser();
-  } catch (error) {
-    console.error("Avatar upload authentication failed", error);
-    return errorResponse("The upload service is temporarily unavailable. Please try again.", 500);
-  }
+  const user = await getUser();
   if (!user) return errorResponse("Sign in to update your profile photo.", 401);
 
   const contentLength = Number(request.headers.get("content-length"));
@@ -59,8 +50,7 @@ export async function POST(request: Request) {
   let form: FormData;
   try {
     form = await request.formData();
-  } catch (error) {
-    console.error("Avatar upload request could not be parsed", error);
+  } catch {
     return errorResponse("The upload request could not be read. Choose an image under 2 MB and try again.", 400);
   }
 
@@ -72,8 +62,7 @@ export async function POST(request: Request) {
   let bytes: Buffer;
   try {
     bytes = Buffer.from(await file.arrayBuffer());
-  } catch (error) {
-    console.error("Avatar upload data could not be read", error);
+  } catch {
     return errorResponse("The image could not be read. Please choose it again and retry.", 400);
   }
   if (!validImage(bytes, file.type)) return errorResponse("This image file could not be verified.", 400);
@@ -96,32 +85,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ url }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     await unlink(target).catch(() => {});
-    console.error("Avatar upload could not be saved", { userId: user.id, uploadDir, error });
-    const message = isStoragePermissionError(error)
-      ? "The server cannot write to the upload folder. Please contact support."
-      : "The photo could not be saved. Please try again.";
-    return errorResponse(message, 500);
+    throw error;
   }
-}
+});
 
-export async function DELETE(request: Request) {
+export const DELETE = withApiErrorBoundary("avatar removal DELETE", async (request: Request) => {
   if (!hasSameOrigin(request)) return errorResponse("Cross-origin request rejected.", 403);
-  let user: Awaited<ReturnType<typeof getUser>>;
-  try {
-    user = await getUser();
-  } catch (error) {
-    console.error("Avatar removal authentication failed", error);
-    return errorResponse("The profile service is temporarily unavailable. Please try again.", 500);
-  }
+  const user = await getUser();
   if (!user) return errorResponse("Authentication required.", 401);
 
-  try {
-    const profile = await db.profile.findUnique({ where: { userId: user.id }, select: { avatarUrl: true } });
-    await db.profile.upsert({ where: { userId: user.id }, create: { userId: user.id }, update: { avatarUrl: null } });
-    await removeStoredAvatar(profile?.avatarUrl);
-    return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
-  } catch (error) {
-    console.error("Avatar could not be removed", { userId: user.id, error });
-    return errorResponse("The photo could not be removed. Please try again.", 500);
-  }
-}
+  const profile = await db.profile.findUnique({ where: { userId: user.id }, select: { avatarUrl: true } });
+  await db.profile.upsert({ where: { userId: user.id }, create: { userId: user.id }, update: { avatarUrl: null } });
+  await removeStoredAvatar(profile?.avatarUrl);
+  return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
+});
