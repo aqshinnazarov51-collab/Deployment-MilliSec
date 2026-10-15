@@ -5,11 +5,14 @@ export async function POST(req: NextRequest) {
   const userAgent = req.headers.get("user-agent") ?? "unknown";
   const { pathname } = new URL(req.url);
 
-  // VULNERABLE: User-Agent header is concatenated directly into raw SQL
-  // with no escaping/parameterization (Blind Time-based SQL Injection).
-  await db.$executeRawUnsafe(
-    `INSERT INTO "AnalyticsEvent" ("userAgent","path") VALUES ('${userAgent}','${pathname}')`
-  );
+  // FIXED: uses Prisma's parameterized query builder instead of raw SQL
+  // string concatenation — values are safely escaped/bound, preventing SQLi.
+  await db.analyticsEvent.create({
+    data: {
+      userAgent,
+      path: pathname,
+    },
+  });
 
   return NextResponse.json({ ok: true });
 }

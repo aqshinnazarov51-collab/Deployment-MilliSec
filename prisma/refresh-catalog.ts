@@ -101,6 +101,3 @@ export async function refreshCatalog(db: PrismaClient) {
   console.log(`Refreshed ${updated} courses across four catalog categories. Existing accounts, purchases, favorites, reviews, and progress were preserved.`);
 }
 
-refreshCatalog(db)
-  .catch((error) => { console.error(error); process.exitCode = 1; })
-  .finally(async () => { await db.$disconnect(); });
