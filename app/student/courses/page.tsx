@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { EmptyState } from "@/components/EmptyState";
 import { BookOpenCheck } from "lucide-react";
+import { getCourseThumbnailDisplay } from "@/lib/course-covers";
 
 export default async function MyCourses() {
   const user = await requireUser("STUDENT");
@@ -57,13 +58,12 @@ export default async function MyCourses() {
           <table className="data-table">
             <thead><tr><th>Course</th><th>Progress</th><th>Last activity</th><th /></tr></thead>
             <tbody>
-              {rows.map(({ enrollment, lessons, completed, nextLesson, percent }) => (
-                <tr key={enrollment.id}>
+              {rows.map(({ enrollment, lessons, completed, nextLesson, percent }) => {
+                const thumbnail = getCourseThumbnailDisplay(enrollment.course.thumbnail);
+                return <tr key={enrollment.id}>
                   <td>
                     <div style={{ display: "flex", gap: 11, alignItems: "center" }}>
-                      <span className="course-thumb" style={{ background: (enrollment.course.thumbnail ?? "✦|#edf0ff").split("|")[1] }}>
-                        {(enrollment.course.thumbnail ?? "✦|").split("|")[0]}
-                      </span>
+                      <span className="course-thumb" style={{ background: thumbnail.color }}>{thumbnail.icon}</span>
                       <div>
                         <strong>{enrollment.course.title}</strong>
                         <div className="small-note">{enrollment.course.instructor.firstName} {enrollment.course.instructor.lastName}</div>
@@ -80,8 +80,8 @@ export default async function MyCourses() {
                       {percent === 100 ? "Review" : "Continue"}
                     </Link>
                   </td>
-                </tr>
-              ))}
+                </tr>;
+              })}
             </tbody>
           </table>
         </div>

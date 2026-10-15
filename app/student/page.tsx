@@ -3,6 +3,7 @@ import { BookOpenCheck, PlayCircle, ReceiptText, Sparkles } from "lucide-react";
 import { CourseCard } from "@/components/CourseCard";
 import { LearningHabitCard } from "@/components/LearningHabitCard";
 import { db } from "@/lib/db";
+import { getCourseThumbnailDisplay } from "@/lib/course-covers";
 import { requireUser } from "@/lib/auth";
 import { EmptyState } from "@/components/EmptyState";
 
@@ -114,13 +115,14 @@ export default async function StudentHome() {
       <div className="split">
         <section className="panel">
           <div className="panel-header"><h2>Pick up where you left off</h2><Link href="/student/courses" className="text-link">All my courses →</Link></div>
-          {coursesWithProgress.length ? coursesWithProgress.slice(0, 4).map((course) => (
-            <div className="course-row" key={course.id}>
-              <div className="course-thumb" style={{ background: (course.course.thumbnail ?? "✦|#edf0ff").split("|")[1] }}>{(course.course.thumbnail ?? "✦|").split("|")[0]}</div>
+          {coursesWithProgress.length ? coursesWithProgress.slice(0, 4).map((course) => {
+            const thumbnail = getCourseThumbnailDisplay(course.course.thumbnail);
+            return <div className="course-row" key={course.id}>
+              <div className="course-thumb" style={{ background: thumbnail.color }}>{thumbnail.icon}</div>
               <div className="course-row-main"><strong>{course.course.title}</strong><small>{course.done} of {course.total} lessons · {course.percent}%</small><div className="progress-track"><span style={{ width: `${course.percent}%` }} /></div></div>
               <Link className="button button-quiet button-small" href={`/student/courses/${course.course.id}/learn`}>Continue</Link>
-            </div>
-          )) : (
+            </div>;
+          }) : (
             <EmptyState icon={BookOpenCheck} title="Your next chapter is waiting" action={{href:"/catalog",label:"Explore courses"}}>Choose a course to start learning at your own pace.</EmptyState>
           )}
         </section>

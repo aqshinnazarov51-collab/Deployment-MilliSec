@@ -10,3 +10,10 @@ export const courseCoverChoices = [
 export function getCourseCover(slug: string) {
   return getCatalogContent(slug)?.cover ?? "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1000&q=85";
 }
+
+export function getCourseThumbnailDisplay(thumbnail: string | null | undefined) {
+  const preset = /^(.{1,12})\|(#[0-9a-f]{6})$/i.exec(thumbnail ?? "");
+  return preset
+    ? { icon: preset[1], color: preset[2] }
+    : { icon: "✦", color: "#edf0ff" };
+}

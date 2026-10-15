@@ -6,6 +6,7 @@ type SearchParams = Promise<{ error?: string; sent?: string; devResetUrl?: strin
 
 export default async function ForgotPassword({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
+  const devResetHref = getDevelopmentResetHref(params.devResetUrl);
   return (
     <main className="form-page">
       <section className="form-card">
@@ -13,9 +14,9 @@ export default async function ForgotPassword({ searchParams }: { searchParams: S
         <h1>Reset your password.</h1>
         <p>Enter the email address for your Lumio account. If it is registered, we’ll send a reset link.</p>
         {params.sent ? <Alert success="If that email is registered, a password reset link has been sent." /> : <Alert error={params.error} />}
-        {params.devResetUrl && process.env.NODE_ENV !== "production" && (
+        {devResetHref && process.env.NODE_ENV !== "production" && (
           <div className="success-note" role="status" style={{ marginBottom: 16 }}>
-            Development link (shown only on your local server): <Link className="text-link" href={params.devResetUrl}>Reset password</Link>
+            Development link (shown only on your local server): <Link className="text-link" href={devResetHref}>Reset password</Link>
           </div>
         )}
         <form action={requestPasswordResetAction}>
@@ -31,4 +32,31 @@ export default async function ForgotPassword({ searchParams }: { searchParams: S
       </section>
     </main>
   );
+}
+
+function getDevelopmentResetHref(value: string | undefined) {
+  if (!value) return null;
+
+  try {
+    const url = new URL(value);
+    const token = url.searchParams.get("token");
+    if (
+      !["http:", "https:"].includes(url.protocol) ||
+      url.username ||
+      url.password ||
+      url.hash ||
+      url.pathname !== "/reset-password" ||
+      url.searchParams.size !== 1 ||
+      !token ||
+      !/^[a-f0-9]{64}$/i.test(token)
+    ) {
+      return null;
+    }
+
+    // Keep the link on this application even if the query string contains
+    // an absolute URL. Never pass an untrusted scheme through to an anchor.
+    return `/reset-password?token=${encodeURIComponent(token)}`;
+  } catch {
+    return null;
+  }
 }
