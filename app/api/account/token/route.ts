@@ -4,9 +4,10 @@ import { signJwt } from "@/lib/jwt";
 import { withApiErrorBoundary } from "@/lib/api-error";
 
 export const GET = withApiErrorBoundary("account token GET", async () => {
+  const headers = { "Cache-Control": "private, no-store" };
   const user = await getUser();
-  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401, headers });
   const issuedAt = Math.floor(Date.now() / 1000);
   const token = signJwt({ sub: user.id, role: user.role, email: user.email, iat: issuedAt, exp: issuedAt + 15 * 60 });
-  return NextResponse.json({ token });
+  return NextResponse.json({ token }, { headers });
 });

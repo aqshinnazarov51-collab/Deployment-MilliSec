@@ -7,9 +7,9 @@ import { requireAdmin } from "@/lib/auth";
 export async function toggleUserBlock(form: FormData) {
   const admin = await requireAdmin();
   const userId = String(form.get("userId") ?? "");
-  if (userId === admin.id) redirect("/admin?error=You+cannot+block+your+own+account");
+  if (userId === admin.id) redirect("/admin?error=cannot_block_self");
   const user = await db.user.findUnique({ where: { id: userId } });
-  if (!user || user.role === "ADMIN") redirect("/admin?error=This+account+cannot+be+changed");
+  if (!user || user.role === "ADMIN") redirect("/admin?error=account_cannot_be_changed");
   await db.user.update({ where: { id: userId }, data: { blocked: !user.blocked } });
   revalidatePath("/admin");
 }
@@ -18,7 +18,7 @@ export async function setCourseVisibility(form: FormData) {
   await requireAdmin();
   const courseId = String(form.get("courseId") ?? "");
   const status = String(form.get("status") ?? "");
-  if (!["PUBLISHED", "HIDDEN"].includes(status)) redirect("/admin?error=Invalid+course+status");
+  if (!["PUBLISHED", "HIDDEN"].includes(status)) redirect("/admin?error=invalid_course_status");
   await db.course.updateMany({ where: { id: courseId }, data: { status } });
   revalidatePath("/admin");
   revalidatePath("/catalog");

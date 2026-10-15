@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isSupportedYouTubeUrl } from "@/lib/youtube";
 export const emailSchema = z.string().trim().email("Enter a valid email address").max(254).transform(v => v.toLowerCase());
 export const PASSWORD_MIN_LENGTH = 15;
 export const PASSWORD_MAX_BYTES = 72;
@@ -56,4 +57,4 @@ const courseThumbnailSchema = z.string().trim().max(400).refine((value) => {
   }
 }, "Use a preset cover or a valid HTTP/HTTPS image URL");
 
-export const courseSchema = z.object({ title:z.string().trim().min(5).max(100), subtitle:z.string().trim().min(5).max(180), description:z.string().trim().min(30).max(6000), categoryId:z.string().min(1), level:z.enum(["BEGINNER","INTERMEDIATE","ADVANCED"]), language:z.string().trim().min(2).max(40), price:z.coerce.number().int().min(0).max(100000), status:z.enum(["DRAFT","PUBLISHED","HIDDEN"]), thumbnail:courseThumbnailSchema.optional(), sections:z.array(z.object({ title:z.string().trim().min(2).max(100), lessons:z.array(z.object({ title:z.string().trim().min(2).max(120), description:z.string().trim().max(1000).default(""), videoUrl:z.union([z.string().trim().url().refine(v=>v.startsWith("https://")||v.startsWith("http://"),"Video links must use HTTP or HTTPS"),z.literal("")]).optional(), durationMinutes:z.coerce.number().int().min(1).max(600) })).min(1) })).min(1) });
+export const courseSchema = z.object({ title:z.string().trim().min(5).max(100), subtitle:z.string().trim().min(5).max(180), description:z.string().trim().min(30).max(6000), categoryId:z.string().min(1), level:z.enum(["BEGINNER","INTERMEDIATE","ADVANCED"]), language:z.string().trim().min(2).max(40), price:z.coerce.number().int().min(0).max(100000), status:z.enum(["DRAFT","PUBLISHED","HIDDEN"]), thumbnail:courseThumbnailSchema.optional(), sections:z.array(z.object({ title:z.string().trim().min(2).max(100), lessons:z.array(z.object({ title:z.string().trim().min(2).max(120), description:z.string().trim().max(1000).default(""), videoUrl:z.union([z.string().trim().url().refine(isSupportedYouTubeUrl,"Use a valid YouTube video link"),z.literal("")]).optional(), durationMinutes:z.coerce.number().int().min(1).max(600) })).min(1) })).min(1) });

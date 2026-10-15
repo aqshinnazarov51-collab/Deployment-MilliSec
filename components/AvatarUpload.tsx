@@ -4,8 +4,16 @@ import { useRef, useState } from "react";
 import { Camera, Trash2 } from "lucide-react";
 
 function profilePhotoSource(value: string | null | undefined) {
-  if (value?.startsWith("/uploads/")) return `/api/uploads/${value.slice("/uploads/".length)}`;
-  return value ?? "";
+  if (!value) return "";
+  const localMatch = value.match(/^\/(?:api\/)?uploads\/([a-f0-9-]{36}\.(?:jpg|png|webp|gif))$/i);
+  if (localMatch) return `/api/uploads/${localMatch[1]}`;
+
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "https:" && !parsed.username && !parsed.password ? parsed.href : "";
+  } catch {
+    return "";
+  }
 }
 
 export function AvatarUpload({ initialUrl, name }: { initialUrl: string | null; name: string }) {
@@ -37,9 +45,10 @@ export function AvatarUpload({ initialUrl, name }: { initialUrl: string | null; 
       const result = await response.json().catch(() => ({} as { error?: string; url?: string }));
       URL.revokeObjectURL(preview);
       if (!response.ok) throw new Error(result.error ?? `Upload failed (HTTP ${response.status}). Please try again.`);
-      if (typeof result.url !== "string") throw new Error("The server returned an invalid upload response. Please try again.");
+      const safeUrl = typeof result.url === "string" ? profilePhotoSource(result.url) : "";
+      if (!safeUrl.startsWith("/api/uploads/")) throw new Error("The server returned an invalid upload response. Please try again.");
 
-      setUrl(`${result.url}?v=${Date.now()}`);
+      setUrl(`${safeUrl}?v=${Date.now()}`);
       setImageFailed(false);
       setMessage("Photo saved");
       setMessageIsError(false);

@@ -30,7 +30,15 @@ export function getAvatarUrl(filename: string) {
 
 export function getAvatarSrc(url: string | null | undefined) {
   const filename = getAvatarFilename(url);
-  return filename ? getAvatarUrl(filename) : url ?? "";
+  if (filename) return getAvatarUrl(filename);
+  if (!url) return null;
+
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" && !parsed.username && !parsed.password ? parsed.href : null;
+  } catch {
+    return null;
+  }
 }
 
 export function getAvatarContentType(filename: string) {

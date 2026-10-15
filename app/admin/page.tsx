@@ -14,9 +14,18 @@ function date(value: Date) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(value);
 }
 
+const adminErrors: Record<string, string> = {
+  cannot_block_self: "You cannot block your own account.",
+  account_cannot_be_changed: "This account cannot be changed.",
+  invalid_course_status: "The requested course status is invalid.",
+};
+
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   await requireAdmin();
   const { error } = await searchParams;
+  const errorMessage = error && Object.prototype.hasOwnProperty.call(adminErrors, error)
+    ? adminErrors[error]
+    : undefined;
   const paidWhere: Prisma.OrderWhereInput = { status: { in: ["COMPLETED", "PAID"] } };
   const [
     totalUsers, activeUsers, totalCourses, publishedCourses, totalOrders, paidOrderCount, revenue,
@@ -69,7 +78,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         </div>
       </section>
 
-      <Alert error={error} />
+      <Alert error={errorMessage} />
 
       <section className="admin-metrics" aria-label="Platform overview">
         <article className="admin-metric">
