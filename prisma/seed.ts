@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { addDemoReviews, applyDemoCourseDurations, applyDemoCourseVideos, demoCourseDurations } from "./demo-videos";
 import { applyExtraDemoCourses, extraDemoCourses } from "./extra-courses";
 import { refreshCatalog } from "./refresh-catalog";
+import { passwordSchema, passwordUsesAccountInfo } from "../lib/validation";
 
 const db = new PrismaClient();
 
@@ -65,8 +66,12 @@ async function main() {
     ["SEED_ADMIN_PASSWORD", process.env.SEED_ADMIN_PASSWORD ?? ""],
   ] as const;
   for (const [name, password] of seedPasswords) {
-    if (password.length < 12) {
-      throw new Error(`Set ${name} to a unique strong value of at least 12 characters before seeding.`);
+    const parsed = passwordSchema.safeParse(password);
+    if (!parsed.success) throw new Error(`Set ${name} to a unique password that meets the password policy before seeding.`);
+  }
+  for (const person of people) {
+    if (passwordUsesAccountInfo(person.password, [person.email, person.username, person.firstName, person.lastName])) {
+      throw new Error("Do not include a demo account name, username, or email in its seed password.");
     }
   }
   if (new Set(seedPasswords.map(([, password]) => password)).size !== seedPasswords.length) {

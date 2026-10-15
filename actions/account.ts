@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { createSession, requireUser } from "@/lib/auth";
-import { emailSchema, passwordSchema } from "@/lib/validation";
+import { emailSchema, passwordSchema, passwordUsesAccountInfo } from "@/lib/validation";
 
 export async function updateProfile(form:FormData){
   const user=await requireUser(),firstName=String(form.get("firstName")??"").trim(),lastName=String(form.get("lastName")??"").trim(),username=String(form.get("username")??"").trim();
@@ -32,11 +32,13 @@ export async function changePassword(form:FormData){
   const user=await requireUser(),current=String(form.get("currentPassword")??""),next=String(form.get("newPassword")??""),confirm=String(form.get("confirmPassword")??"");
   const path=user.role==="INSTRUCTOR"?"/instructor/settings":"/student/settings";
   const parsed=passwordSchema.safeParse(next);
+  if(!parsed.success) redirect(`${path}?error=${encodeURIComponent(parsed.error.issues[0].message)}`);
+  if(passwordUsesAccountInfo(parsed.data,[user.email,user.username,user.firstName,user.lastName])) redirect(`${path}?error=${encodeURIComponent("Do not include your name, username, or email in your password")}`);
+  if(next!==confirm) redirect(`${path}?error=${encodeURIComponent("Passwords do not match")}`);
   const credential=await db.user.findUnique({where:{id:user.id},select:{passwordHash:true}});
   if(!credential||!await bcrypt.compare(current,credential.passwordHash)) redirect(`${path}?error=Current+password+is+incorrect`);
-  if(!parsed.success||next!==confirm) redirect(`${path}?error=${encodeURIComponent(parsed.success?"Passwords do not match":parsed.error.issues[0].message)}`);
   await db.$transaction(async tx=>{
-    await tx.user.update({where:{id:user.id},data:{passwordHash:await bcrypt.hash(next,12)}});
+    await tx.user.update({where:{id:user.id},data:{passwordHash:await bcrypt.hash(parsed.data,12)}});
     await tx.session.deleteMany({where:{userId:user.id}});
   });
   await createSession(user.id);

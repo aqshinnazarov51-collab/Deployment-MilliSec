@@ -1,4 +1,3 @@
-import { updateProfile } from "@/actions/account";
 import { requireUser } from "@/lib/auth";
 import { Alert } from "@/components/Message";
 import { AvatarUpload } from "@/components/AvatarUpload";

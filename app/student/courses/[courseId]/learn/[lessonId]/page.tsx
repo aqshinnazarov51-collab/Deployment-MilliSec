@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound,redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { ArrowLeft,ArrowRight,CheckCircle2,LockKeyhole } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";

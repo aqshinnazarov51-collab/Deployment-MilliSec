@@ -49,7 +49,9 @@ npm start
 
 ## Demo accounts
 
-The seed creates local-only student, instructor, and administrator accounts. Before running it, configure `ALLOW_DEMO_SEED=true` and set unique `SEED_STUDENT_PASSWORD`, `SEED_INSTRUCTOR_PASSWORD`, and `SEED_ADMIN_PASSWORD` values of at least 12 characters in your local environment. Seeding is blocked in production and resets demo records. Never reuse production credentials for demo accounts.
+The seed creates local-only student, instructor, and administrator accounts. Before running it, configure `ALLOW_DEMO_SEED=true` and set unique `SEED_STUDENT_PASSWORD`, `SEED_INSTRUCTOR_PASSWORD`, and `SEED_ADMIN_PASSWORD` values that meet the password policy (at least 15 characters) in your local environment. Seeding is blocked in production and resets demo records. Never reuse production credentials for demo accounts.
+
+Registration, password changes, and password resets require at least 15 characters, reject common passwords and passwords containing account details, and accept long passphrases with spaces. No uppercase, number, or symbol mix is required.
 
 The seed creates 10 published courses, nine categories, three instructors, lessons, reviews, a student enrollment, a completed demo order, and notifications.
 

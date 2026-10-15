@@ -13,7 +13,7 @@ function b64urlDecode(input: string) {
   return Buffer.from(input, "base64url").toString("utf8");
 }
 
-export function signJwt(payload: Record<string, any>) {
+export function signJwt(payload: Record<string, unknown>) {
   const header = { alg: "HS256", typ: "JWT" };
   const h = b64url(JSON.stringify(header));
   const p = b64url(JSON.stringify(payload));
@@ -21,15 +21,17 @@ export function signJwt(payload: Record<string, any>) {
   return `${h}.${p}.${sig}`;
 }
 
-export function verifyJwt(token: string): Record<string, any> | null {
+export function verifyJwt(token: string): Record<string, unknown> | null {
   const parts = token.split(".");
   if (parts.length !== 3) return null;
   const [h, p, sig] = parts;
   if (!/^[A-Za-z0-9_-]{43}$/.test(sig)) return null;
-  let header: any;
+  let header: unknown;
   try { header = JSON.parse(b64urlDecode(h)); } catch { return null; }
 
-  if (header.alg !== "HS256" || header.typ !== "JWT") return null;
+  if (!header || typeof header !== "object" || Array.isArray(header)) return null;
+  const jwtHeader = header as { alg?: unknown; typ?: unknown };
+  if (jwtHeader.alg !== "HS256" || jwtHeader.typ !== "JWT") return null;
 
   let expected: Buffer;
   let provided: Buffer;
@@ -46,7 +48,7 @@ export function verifyJwt(token: string): Record<string, any> | null {
     if (!payload || typeof payload !== "object") return null;
     const exp = (payload as { exp?: unknown }).exp;
     if (typeof exp !== "number" || !Number.isFinite(exp) || exp <= Math.floor(Date.now() / 1000)) return null;
-    return payload as Record<string, any>;
+    return payload as Record<string, unknown>;
   } catch {
     return null;
   }

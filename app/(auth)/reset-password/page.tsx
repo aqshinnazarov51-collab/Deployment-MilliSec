@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { completePasswordResetAction } from "@/actions/password-reset";
 import { Alert } from "@/components/Message";
+import { PASSWORD_MAX_BYTES, PASSWORD_MIN_LENGTH } from "@/lib/validation";
 
 type SearchParams = Promise<{ token?: string; error?: string }>;
 
@@ -13,18 +14,18 @@ export default async function ResetPassword({ searchParams }: { searchParams: Se
       <section className="form-card">
         <div className="eyebrow">Account recovery</div>
         <h1>Choose a new password.</h1>
-        <p>Use at least 8 characters, including an uppercase letter, a lowercase letter, and a number.</p>
+        <p>Use at least {PASSWORD_MIN_LENGTH} characters. Long passphrases and spaces are allowed; common or account-related passwords are blocked.</p>
         <Alert error={params.error} />
         {tokenLooksValid ? (
           <form action={completePasswordResetAction}>
             <input type="hidden" name="token" value={token} />
             <div className="field">
               <label htmlFor="new-password">New password</label>
-              <input id="new-password" required name="password" type="password" minLength={12} maxLength={72} autoComplete="new-password" />
+              <input id="new-password" required name="password" type="password" minLength={PASSWORD_MIN_LENGTH} maxLength={PASSWORD_MAX_BYTES} autoComplete="new-password" />
             </div>
             <div className="field">
               <label htmlFor="confirm-password">Confirm new password</label>
-              <input id="confirm-password" required name="confirmPassword" type="password" minLength={12} maxLength={72} autoComplete="new-password" />
+              <input id="confirm-password" required name="confirmPassword" type="password" minLength={PASSWORD_MIN_LENGTH} maxLength={PASSWORD_MAX_BYTES} autoComplete="new-password" />
             </div>
             <button className="button full">Update password</button>
           </form>

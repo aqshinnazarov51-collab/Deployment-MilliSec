@@ -77,7 +77,7 @@ export function LearningHabitCard({ completedAt }: { completedAt: string[] }) {
         </div>
       </div>
       <div style={{ display: "flex", gap: 9, marginTop: 16, justifyContent: "space-between" }} aria-label="Completed lessons in the last seven days">
-        {(stats?.week ?? Array.from({ length: 7 }, (_, index) => ({ label: "···", count: 0 }))).map((day, index) => (
+        {(stats?.week ?? Array.from({ length: 7 }, () => ({ label: "···", count: 0 }))).map((day, index) => (
           <div key={`${day.label}-${index}`} title={`${day.label}: ${day.count} lessons`} style={{ display: "grid", justifyItems: "center", gap: 4 }}>
             <span style={{ width: 27, height: 27, borderRadius: 9, display: "grid", placeItems: "center", background: day.count ? "#dff5e9" : "var(--wash)", color: day.count ? "#30865b" : "var(--muted)", fontSize: 11, fontWeight: 700 }}>{day.count || "·"}</span>
             <span className="small-note" style={{ fontSize: 9 }}>{day.label}</span>

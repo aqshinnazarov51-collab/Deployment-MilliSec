@@ -4,7 +4,7 @@ import { createHash, randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { emailSchema, passwordSchema } from "@/lib/validation";
+import { emailSchema, passwordSchema, passwordUsesAccountInfo } from "@/lib/validation";
 
 const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
 
@@ -89,6 +89,14 @@ export async function completePasswordResetAction(form: FormData) {
   const resetRecord = await db.passwordResetToken.findUnique({ where: { tokenHash } });
   if (!resetRecord || resetRecord.expiresAt <= new Date()) {
     redirect(`/forgot-password?error=${encodeURIComponent("This reset link is invalid or expired")}`);
+  }
+
+  const account = await db.user.findUnique({
+    where: { id: resetRecord.userId },
+    select: { email: true, username: true, firstName: true, lastName: true },
+  });
+  if (!account || passwordUsesAccountInfo(password, [account.email, account.username, account.firstName, account.lastName])) {
+    redirect(`/reset-password?token=${encodeURIComponent(token)}&error=${encodeURIComponent("Do not include your name, username, or email in your password")}`);
   }
 
   const passwordHash = await bcrypt.hash(parsedPassword.data, 12);

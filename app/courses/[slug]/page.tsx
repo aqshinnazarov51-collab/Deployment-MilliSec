@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowRight, BookOpenCheck, Clock3, Globe2, GraduationCap, Heart, PlayCircle, Star, Users } from "lucide-react";
+import { ArrowRight, BookOpenCheck, Clock3, Globe2, GraduationCap, Heart, PlayCircle, Star } from "lucide-react";
 import { db } from "@/lib/db";
 import { getUser } from "@/lib/auth";
 import { reviewCourse } from "@/actions/learning";

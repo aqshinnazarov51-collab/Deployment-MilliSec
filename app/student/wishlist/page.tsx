@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Heart } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
